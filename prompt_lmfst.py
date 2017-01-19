@@ -84,6 +84,7 @@ class PromptLMFST(object):
     def isDeterministic(self):
         # Checks if the FST is deterministic, i.e. no state has multiple
         # outgoing arcs with the same label.
+        #TODO: should follow <eps> transitions, as these must be removed anyway.
         states={}
         for arc in self.arcs:
             if arc.in_label in states.setdefault(arc.from_state,[]):
