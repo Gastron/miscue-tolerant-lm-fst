@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-# Copyright 2017 Aku Rouhe 
+# Copyright 2017 Aku Rouhe
 # Licence: BSD-2-Clause
 
 from __future__ import print_function
-from collections import Counter, namedtuple
+from collections import namedtuple
 
 
 class Word(object):
@@ -15,14 +15,14 @@ class Word(object):
     ## In general, labels are the input and output labels of an FST
     def __init__(self, label, start, final):
         self.label = label
-        self.start = start 
-        self.final = final 
+        self.start = start
+        self.final = final
         self.nextStart = self.final
         self.prevFinal = self.start
 
 #FST Building-block classes:
 Arc = namedtuple("Arc", "from_state to_state in_label out_label weight")
-FinalState = namedtuple('FinalState', "state weight")
+FinalState = namedtuple("FinalState", "state weight")
 
 class PromptLMFST(object):
     ## Language model weighted finite state transducer
@@ -30,13 +30,13 @@ class PromptLMFST(object):
     ## Represents the prompt as a sequence of Word objects.
 
     def __init__(self,ID=None):
-        self.ID = ID 
+        self.ID = ID
         self.arcs = [] #Arc objects
         self.words = [] #Word objects
         self.final_states = [] #FinalState objects
         self.state_counter = 0
         self.initialised = False
-   
+
     def addNextWord(self, label):
         # Use this to add words one by one into the PromptLMFST from a prompt text
         # Note: This does not add an arc between the start and final states of the word.
@@ -47,7 +47,7 @@ class PromptLMFST(object):
             self.initialised = True
         else:
             self.words.append(Word(label, self.curr_word.final, self.newState()))
-    
+
     @property
     def curr_word(self):
         # This is the last word added to the FST
@@ -79,18 +79,17 @@ class PromptLMFST(object):
             result += " ".join(map(str,arc)) + "\n"
         for finalstate in self.finalstates:
             result += " ".join(map(str,finalstate)) + "\n"
-	    return result
-    
+        return result
+
     def isDeterministic(self):
         # Checks if the FST is deterministic, i.e. no state has multiple
-        # outgoing arcs with the same label.
-        #TODO: should follow <eps> transitions, as these must be removed anyway.
+        # outgoing arcs with the same input label.
+        # NOTE: This method does treats epsilons like any other label.
         states={}
         for arc in self.arcs:
             if arc.in_label in states.setdefault(arc.from_state,[]):
                 return False
-            else: 
+            else:
                 states[arc.from_state].append(arc.in_label)
         return True
-
 
