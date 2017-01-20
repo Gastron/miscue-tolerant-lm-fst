@@ -77,8 +77,8 @@ class PromptLMFST(object):
         result = "" if self.ID is None else self.ID + "\n"
         for arc in self.arcs:
             result += " ".join(map(str,arc)) + "\n"
-        for finalstate in self.finalstates:
-            result += " ".join(map(str,finalstate)) + "\n"
+        for final_state in self.final_states:
+            result += " ".join(map(str,final_state)) + "\n"
         return result
 
     def isDeterministic(self):

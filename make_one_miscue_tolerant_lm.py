@@ -3,6 +3,7 @@
 from __future__ import print_function
 import prompt_lmfst
 import argparse
+import sys
 
 parser = argparse.ArgumentParser(description="""
         This script creates a reading miscue tolerant language model,
@@ -36,7 +37,7 @@ weights = {
 # The special_labels dict defines non-word labels which are used for
 # the miscue paths. Not all need specific labels, but some do.
 special_labels = {
-        "Epsilon":      "<eps>"
+        "Epsilon":      "<eps>",
         "Rubbish":      "[RUB]",
         "Skip":         "[SKP]",
 }
@@ -98,6 +99,17 @@ def addRepeatPaths(p_fst, weights):
 
 
 
-
-
+args = parser.parse_args()
 fst = prompt_lmfst.PromptLMFST()
+prompt = sys.stdin.readline()
+prompt_tokenised = prompt.strip().split()
+if not prompt_tokenised:
+    raise ValueError("Prompt empty!")
+fst.addWordSequence(prompt_tokenised)
+addCorrectPaths(fst, weights)
+addRubbishPaths(fst, weights)
+addSkipPaths(fst, weights)
+addRepeatPaths(fst, weights)
+print(fst.inText())
+
+
