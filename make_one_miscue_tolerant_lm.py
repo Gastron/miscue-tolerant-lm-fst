@@ -4,6 +4,7 @@ from __future__ import print_function
 import prompt_lmfst
 import argparse
 import sys
+from collections import Counter
 
 parser = argparse.ArgumentParser(description="""
         This script creates a reading miscue tolerant language model,
@@ -28,6 +29,8 @@ weights = {
         "Repeat":       30,     #Jump backward one word
         "JumpForward":  5,      #Jump forward multiple words
         "JumpBackward": 5,      #Jump backward multiple words
+        "LongJumpDecay":0.9,    #A decay term applied to the relative probability for jumps: 
+                                #P(jump) = d^n * <jump_relative_probability>, n == number of words jumped over
         "Truncation":   5,      #An incomplete pronounciation
         "PrematureEnd": 3,      #Unexpected end of utterance
         "FinalState":   0.0     #NOTE: This is an actual weight!
@@ -95,9 +98,33 @@ def addRepeatPaths(p_fst, weights):
             p_fst.words[-1].label, p_fst.words[-1].label,
             weights["Repeat"])
 
+def addPrematureEnds(p_fst, weights):
+    # Add a premature end at the beginning of every word
+    # Thus it won't happen at the very end.
+    for word in p_fst.words:
+        p_fst.addFinalState(word.start, weights["PrematureEnd"])
 
-
-
+def addJumpsBackwards(p_fst, weights):
+    for i, word in enumerate(p_fst.words):
+        # We must keep track of input labels available from this state
+        # otherwise might end up with indeterministic or even non-functional fst.
+        labels_seen = {word.label: True} 
+        # Next we add jump back arcs, in reverse order so that for a given label,
+        # only the latest occurrence can be gone back to.
+        # Also, n=number of jumps
+        for n, prev_word in enumerate(reversed(p_fst.words[:i])):
+            # The latest word is special; we add a repeat arc, not a jump back arc.
+            # However, we must take its label into account
+            if n == 0:
+                labels_seen[prev_word.label] = True
+                continue
+            if prev_word.label not in labels_seen:
+                decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpBackward"]
+                p_fst.addArc(word.start, prev_word.final,
+                        prev_word.label, prev_word.label,
+                        decayed_weight)
+                labels_seen[prev_word.label] = True
+            
 
 args = parser.parse_args()
 fst = prompt_lmfst.PromptLMFST()
@@ -110,6 +137,6 @@ addCorrectPaths(fst, weights)
 addRubbishPaths(fst, weights)
 addSkipPaths(fst, weights)
 addRepeatPaths(fst, weights)
+addPrematureEnds(fst, weights)
+addJumpsBackwards(fst, weights)
 print(fst.inText())
-
-
