@@ -1,5 +1,7 @@
 <eps> 0
-the 1
-cat 2
-and 3
-dog 4
+[RUB] 1
+[SKP] 2
+the 3
+cat 4
+and 5
+dog 6
