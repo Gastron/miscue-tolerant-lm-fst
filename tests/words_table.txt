@@ -5,3 +5,7 @@ the 3
 cat 4
 and 5
 dog 6
+two 7
+too 8
+carat 9
+carrot 10

@@ -1,22 +1,21 @@
 #!/bin/bash
-# Test make_one_miscue_tolerant_lm by making an fst with it.
+# Test homophones by making an fst with them.
 # Requires openfst and dot (graphviz).
 # Prints a info and draws the output.
-# TODO: make a generic fst compile script for various tests.
 
 set -eu
 set -o pipefail
 
-test_string="the cat"
+test_string="two carat carrot too"
 sym_table="tests/words_table.txt"
 outname=tests/$(echo $test_string | sed -r "s/ /_/g")
 
-echo "Testing make_one_miscue_tolerant_lm.py"
+echo "Testing homophones"
 echo "Test string: $test_string"
 echo
 
 
-echo $test_string | ./make_one_miscue_tolerant_lm.py |\
+echo $test_string | ./make_one_miscue_tolerant_lm.py --homophones tests/homophones.txt |\
     fstcompile --isymbols=$sym_table --osymbols=$sym_table > ${outname}.fst
 
 echo "Here is some info about the WFST:"
