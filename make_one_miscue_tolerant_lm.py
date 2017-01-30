@@ -37,7 +37,7 @@ weights = {
         "Rubbish":      5.,      #Speech-like noises, hesitations, etc.
         "Skip":         10.,     #Jump forward one word
         "Repeat":       30.,     #Jump backward one word
-        "JumpForward":  5.,      #Jump forward multiple words
+        "JumpForward":  2.,      #Jump forward multiple words
         "JumpBackward": 5.,      #Jump backward multiple words
         "LongJumpDecay":0.9,    #A decay term applied to the relative probability for jumps: 
                                 #P(jump) = d^n * <jump_relative_probability>, n == number of words jumped over
@@ -112,16 +112,16 @@ def addPrematureEnds(p_fst, weights):
     for word in p_fst.words:
         p_fst.addFinalState(word.start, weights["PrematureEnd"])
 
-def addJumpsBackwards(p_fst, weights, homophones):
+def addJumpsBackward(p_fst, weights, homophones):
     # This will care of all but the last word 
     # (it's simpler code to add jumps from the start state, so we know the next correct word)
     for i, word, in enumerate(p_fst.words):
         for n, prev_word in enumerate(reversed(p_fst.words[:i])):
-            # n=number of jumps
+            # n = number of words jumped over
             # The latest word is special; we add a repeat arc, not a jump back arc.
             if n==0:
                 continue
-            # If the jump backward brings us to a homophone of the correct next word, 
+            # If the jump backward would consume a homophone of the correct next word, 
             # assume that the correct step was taken. This is the sane choice.
             if prev_word.label not in homophones[word.label]:
                 decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpBackward"]
@@ -135,6 +135,23 @@ def addJumpsBackwards(p_fst, weights, homophones):
             p_fst.addArc(p_fst.words[-1].final, prev_word.final,
                     prev_word.label, prev_word.label,
                     decayed_weight)
+
+def addJumpsForward(p_fst, weights, homophones):
+    # It's again simpler to add jumps from the start states, so we know the next correct word)
+    for i, word, in enumerate(p_fst.words):
+        for n, later_word in enumerate(p_fst.words[i:]):
+            # n = number of words jumped over
+            # The next word is special; we add a skip arc, not a jump forward arc.
+            if n == 0:
+                continue
+            # If the jump forward would consume a homophone of the correct next word,
+            # assume that the correct step was taken. This is again the sane choice.
+            if later_word.label not in homophones[word.label]:
+                decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpForward"]
+                p_fst.addArc(word.start, later_word.final,
+                        later_word.label, later_word.label,
+                        decayed_weight)
+
 
 
 # This function is just used to read the homophones file
@@ -177,5 +194,5 @@ addRubbishPaths(fst, weights)
 addSkipPaths(fst, weights, homophones)
 addRepeatPaths(fst, weights, homophones)
 addPrematureEnds(fst, weights)
-addJumpsBackwards(fst, weights, homophones)
+addJumpsBackward(fst, weights, homophones)
 print(fst.inText())
