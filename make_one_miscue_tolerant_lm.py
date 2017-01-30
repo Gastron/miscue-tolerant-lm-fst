@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from __future__ import print_function
 import prompt_lmfst
 import argparse
@@ -58,9 +57,11 @@ special_labels = {
 
 ## The next functions define recipes for adding the different types of paths
 ## to the FST.
-## The idea is to always consume a label if possible and design the recipes so that they
-## don't add multiple arcs with the same input label from any state.
-## This way we get a fast, deterministic FST.
+## The idea is to always consume a label and design the recipes so that for the truely
+## ambiguous cases, e.g. where in a line of repetitions to put the repetitions, make
+## the choice unified. The FST will not end up 100% deterministic for all phone sequences
+## but in the weight of the paths should end up different and thus the desired path
+## is found (path of least weight).
 
 def addCorrectPaths(p_fst, weights):
     for word in p_fst.words:
@@ -68,8 +69,24 @@ def addCorrectPaths(p_fst, weights):
     p_fst.addFinalState(p_fst.words[-1].final, weights["FinalState"])
 
 def addRubbishPaths(p_fst, weights):
-    for word in p_fst.words:
-        p_fst.addArc(word.start, word.start,
+    # Rubbish means speech like sounds here. This can model e.g. hesitation sounds ("umm") or 
+    # a failed pronunciation
+    # We add a path for rubbish both to be inserted before a word and to be substituted for the word.
+    if len(p_fst.words) > 1:
+        for word, next_word in zip(p_fst.words, p_fst.words[1:]):
+            rubbish_state = p_fst.newState()
+            p_fst.addArc(word.start, rubbish_state,
+                    special_labels["Rubbish"], special_labels["Rubbish"],
+                    weights["Rubbish"])
+            p_fst.addArc(rubbish_state, word.start,
+                    special_labels["Epsilon"], special_labels["Epsilon"],
+                    weights["Correct"])
+            p_fst.addArc(rubbish_state, next_word.final,
+                    next_word.label, next_word.label,
+                    weights["Correct"])
+    # Deal with the last word separately. Don't allow substitution,
+    # this is notated as premature end instead.
+    p_fst.addArc(p_fst.words[-1].start, p_fst.words[-1].start,
             special_labels["Rubbish"], special_labels["Rubbish"],
             weights["Rubbish"])
     p_fst.addArc(p_fst.words[-1].final, p_fst.words[-1].final,
@@ -80,27 +97,29 @@ def addSkipPaths(p_fst, weights, homophones):
     # This will loop over all but the last word.
     # It makes no sense to skip the last word; that should always mean a
     # premature end.
-    for word, next_word in zip(p_fst.words, p_fst.words[1:]):
-        # Don't add skip if a homophone is next.
-        # This way, skips are always notated at the end of a sequence of homophones.
-        if word.label not in homophones[next_word.label]:
-            skip_state = p_fst.newState()
-            p_fst.addArc(word.start, skip_state,
-                    next_word.label, special_labels["Skip"],
-                    weights["Skip"])
-            p_fst.addArc(skip_state, next_word.final,
-                    special_labels["Epsilon"], next_word.label,
-                    weights["Correct"])
+    if len(p_fst.words) > 1:
+        for word, next_word in zip(p_fst.words, p_fst.words[1:]):
+            # Don't add skip if a homophone is next.
+            # This way, skips are always notated at the end of a sequence of homophones.
+            if word.label not in homophones[next_word.label]:
+                skip_state = p_fst.newState()
+                p_fst.addArc(word.start, skip_state,
+                        next_word.label, special_labels["Skip"],
+                        weights["Skip"])
+                p_fst.addArc(skip_state, next_word.final,
+                        special_labels["Epsilon"], next_word.label,
+                        weights["Correct"])
 
 def addRepeatPaths(p_fst, weights, homophones):
-    # This will loop over all but the last word:
-    for word, next_word in zip(p_fst.words, p_fst.words[1:]):
-        # Don't add repeat if a homophone is next in the correct sequence.
-        # This way, repeats are always notated at the end of a sequence of homophones.
-        if word.label not in homophones[next_word.label]:
-            p_fst.addArc(word.final, word.final,
-                    word.label, word.label,
-                    weights["Repeat"])
+    if len(p_fst.words) > 1:
+        # This will loop over all but the last word:
+        for word, next_word in zip(p_fst.words, p_fst.words[1:]):
+            # Don't add repeat if a homophone is next in the correct sequence.
+            # This way, repeats are always notated at the end of a sequence of homophones.
+            if word.label not in homophones[next_word.label]:
+                p_fst.addArc(word.final, word.final,
+                        word.label, word.label,
+                        weights["Repeat"])
     # Then the last word:
     p_fst.addArc(p_fst.words[-1].final, p_fst.words[-1].final,
             p_fst.words[-1].label, p_fst.words[-1].label,
@@ -151,8 +170,6 @@ def addJumpsForward(p_fst, weights, homophones):
                 p_fst.addArc(word.start, later_word.final,
                         later_word.label, later_word.label,
                         decayed_weight)
-
-
 
 # This function is just used to read the homophones file
 def readHomophones(filepath):
