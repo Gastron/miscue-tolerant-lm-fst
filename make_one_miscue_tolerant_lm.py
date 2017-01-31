@@ -3,6 +3,7 @@ from __future__ import print_function
 import prompt_lmfst
 import argparse
 import sys
+import math
 from collections import Counter, defaultdict
 
 parser = argparse.ArgumentParser(description="""
@@ -42,8 +43,8 @@ weights = {
                                 #P(jump) = d^n * <jump_relative_probability>, n == number of words jumped over
         "Truncation":   5.,      #An incomplete pronounciation
         "PrematureEnd": 3.,      #Unexpected end of utterance
-        "FinalState":   0.0     #NOTE: This is an actual weight!
-                                # For interface simplicity, it is kept in the same dict.
+        "FinalState":   100.     #The probability that the utterance ends at the correct point. 
+                                #There could also be repetition, rubbish, etc.
 }
 
 # The special_labels dict defines non-word labels which are used for
@@ -171,6 +172,21 @@ def addJumpsForward(p_fst, weights, homophones):
                         later_word.label, later_word.label,
                         decayed_weight)
 
+def convertRelativeProbs(p_fst):
+    # First normalises the weights in relative probabilities into true
+    # probabilities, then converts to negative logarithms.
+    for state_num, leaves in p_fst.states.items():
+        #leaves has Arcs and FinalStates, both of which have a property called weight
+        total_weight = reduce(lambda x, y: x + y.weight, leaves, 0.)
+        normalised_leaves = []
+        for leaf in leaves:
+            if total_weight == 0. or leaf.weight == 0.:
+                raise ValueError("Relative probability was zero at: " + repr(leaf)) 
+            else:
+                new_weight = -math.log(leaf.weight / total_weight)
+            normalised_leaves.append(leaf._replace(weight = new_weight))
+        p_fst.states[state_num] = normalised_leaves
+
 # This function is just used to read the homophones file
 def readHomophones(filepath):
     # Reads a file where on each line, words are considered homophones
@@ -212,4 +228,6 @@ addSkipPaths(fst, weights, homophones)
 addRepeatPaths(fst, weights, homophones)
 addPrematureEnds(fst, weights)
 addJumpsBackward(fst, weights, homophones)
+
+convertRelativeProbs(fst)
 print(fst.inText())

@@ -24,7 +24,7 @@ fstinfo ${outname}.fst
 
 # If Kaldi is on the path, check fstisstochastic
 if which fstisstochastic; then
-    fstisstochastic ${outname}.fst
+    fstisstochastic ${outname}.fst || echo "FST is not stochastic"
 fi
 
 fstdraw --isymbols=$sym_table --osymbols=$sym_table ${outname}.fst ${outname}.dot

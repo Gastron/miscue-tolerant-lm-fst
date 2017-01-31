@@ -31,9 +31,8 @@ class PromptLMFST(object):
 
     def __init__(self,ID=None):
         self.ID = ID
-        self.arcs = [] #Arc objects
         self.words = [] #Word objects
-        self.final_states = [] #FinalState objects
+        self.states = {}
         self.state_counter = 0
         self.initialised = False
 
@@ -43,6 +42,7 @@ class PromptLMFST(object):
         # We would need a weight for that.
         if not self.initialised:
             #Note: the initial state becomes the value state_counter is initialised to.
+            self.states[self.state_counter] = []
             self.words.append(Word(label, self.state_counter, self.newState()))
             self.initialised = True
         else:
@@ -57,15 +57,16 @@ class PromptLMFST(object):
             return self.words[-1]
 
     def newState(self):
-        # Creates a new, unused state, basically just a new number, returns that number
+        # Creates a new, unused state, with a unique number, returns that number
         self.state_counter += 1
+        self.states[self.state_counter] = []
         return self.state_counter
 
     def addArc(self, from_state, to_state, in_label, out_label, weight):
-        self.arcs.append(Arc(from_state, to_state, in_label, out_label, weight))
+        self.states[from_state].append(Arc(from_state, to_state, in_label, out_label, weight))
 
     def addFinalState(self, state, weight):
-        self.final_states.append(FinalState(state, weight))
+        self.states[state].append(FinalState(state, weight))
 
     def addWordSequence(self, sequence):
         # Sequence is expected to be a list of labels (tokenisation is left to user)
@@ -75,21 +76,22 @@ class PromptLMFST(object):
     def inText(self):
         # Returns a text representation of the FST. Compatible with OpenFST text format.
         result = "" if self.ID is None else self.ID + "\n"
-        for arc in self.arcs:
-            result += " ".join(map(str,arc)) + "\n"
-        for final_state in self.final_states:
-            result += " ".join(map(str,final_state)) + "\n"
+        for state in self.states.values():
+            for leaf in state: #leaf is an Arc or a FinalState
+                result += " ".join(map(str, leaf)) + "\n"
         return result
 
     def isDeterministic(self):
         # Checks if the FST is deterministic, i.e. no state has multiple
         # outgoing arcs with the same input label.
         # NOTE: This method does treats epsilons like any other label.
-        states={}
-        for arc in self.arcs:
-            if arc.in_label in states.setdefault(arc.from_state,[]):
-                return False
-            else:
-                states[arc.from_state].append(arc.in_label)
+        for state in self.states.values():
+            seen_labels = {}
+            for item in state:
+                if has_attr(item, "in_label"):
+                    if item.in_label in seen_labels:
+                        return False
+                    else:
+                        seen_labels[item.in_label] = True
         return True
 
