@@ -13,4 +13,25 @@ if [ "$#" -ne 3 ] then;
 fi
 
 
+dictsrcdir="$1"
+
+workdir="$3"
+promptfile="$3"/prompt
+tmpdir="$3"/tmp
+graphdir="$4"
+
+[ ! -f "$promptfile" ] && echo "Did not find prompt-file $promptfile " >&2 && exit 1;
+
+mkdir -p "$workdir"/phones "$tmpdir" "$graphdir"
+
+silprob=false
+[ -f "$dictsrcdir"/lexiconp_silprob.txt ] && silprob=true
+
+[ -f path.sh ] && . ./path.sh
+
+! utils/validate_dict_dir.pl "$dictsrcdir" && \
+  echo "Error validating directory $dictsrcdir" >&2 && exit 1;
+
+kaldi-scripts/make_modified_lexicon.py "$dictsrcdir" "$tmpdir" "$promptfile"
+
 

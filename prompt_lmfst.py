@@ -17,8 +17,8 @@ class Word(object):
         self.label = label
         self.start = start
         self.final = final
-        self.nextStart = self.final
-        self.prevFinal = self.start
+        self.next_start = self.final
+        self.prev_final = self.start
 
 #FST Building-block classes:
 Arc = namedtuple("Arc", "from_state to_state in_label out_label weight")
