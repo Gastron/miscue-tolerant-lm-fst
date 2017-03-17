@@ -103,13 +103,9 @@ def addSkipPaths(p_fst, weights, homophones):
             # Don't add skip if a homophone is next.
             # This way, skips are always notated at the end of a sequence of homophones.
             if word.label not in homophones[next_word.label]:
-                skip_state = p_fst.newState()
-                p_fst.addArc(word.start, skip_state,
-                        next_word.label, special_labels["Skip"],
+                p_fst.addArc(word.start, next_word.final,
+                        next_word.label, next_word.label,
                         weights["Skip"])
-                p_fst.addArc(skip_state, next_word.final,
-                        special_labels["Epsilon"], next_word.label,
-                        weights["Correct"])
 
 def addRepeatPaths(p_fst, weights, homophones):
     if len(p_fst.words) > 1:
@@ -212,9 +208,12 @@ parser.add_argument('--homophones', nargs="?", help=
         e.g. 
         too two
         carat carrot""")
+parser.add_argument('--rubbish-label', dest="rubbish_label", nargs="?", help=
+        """The label to use for Rubbish, i.e. spoken noise""")
 args = parser.parse_args()
 homophones = readHomophones(args.homophones)
-
+if args.rubbish_label is not None:
+    special_labels["Rubbish"] = args.rubbish_label
 
 fst = prompt_lmfst.PromptLMFST()
 prompt = sys.stdin.readline()

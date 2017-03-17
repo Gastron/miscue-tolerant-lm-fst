@@ -4,9 +4,14 @@
 # using the miscue-tolerant-lm-fst for a language model.
 # The lexicon and language model are created on the fly. 
 
-if [ "$#" -ne 3 ] then;
+set -e -u 
+
+OOV="<SPOKEN_NOISE>"
+keepwords="$OOV !SIL <NOISE>"
+if [ "$#" -ne 4 ]; then
     echo "Usage: $0 <dict-src-dir> <model-dir> <work-dir> <graph-dir>"
-    echo "Note: the work dir is assumed to contain a text file called prompt"
+    echo
+    echo "Note: the work dir is assumed to contain a text file called prompt.txt"
     echo "and be a directory where the script may create any temporary files."
     echo "It may be the same directory as graph-dir, which is where the graph is output."
     exit 1;
@@ -14,24 +19,36 @@ fi
 
 
 dictsrcdir="$1"
-
+modeldir="$2"
 workdir="$3"
-promptfile="$3"/prompt
-tmpdir="$3"/tmp
+
+langdir="$workdir"/lang
+localdictsrc="$langdir"/dict
+langtmpdir="$langdir"/tmp
+
+promptfile="$workdir"/prompt.txt
 graphdir="$4"
+
 
 [ ! -f "$promptfile" ] && echo "Did not find prompt-file $promptfile " >&2 && exit 1;
 
-mkdir -p "$workdir"/phones "$tmpdir" "$graphdir"
-
-silprob=false
-[ -f "$dictsrcdir"/lexiconp_silprob.txt ] && silprob=true
+mkdir -p "$langtmpdir" "$graphdir" "$localdictsrc"
+trap "rm -rf $langtmpdir $localdictsrc $langdir" EXIT HUP INT PIPE TERM
 
 [ -f path.sh ] && . ./path.sh
 
 ! utils/validate_dict_dir.pl "$dictsrcdir" && \
   echo "Error validating directory $dictsrcdir" >&2 && exit 1;
 
-kaldi-scripts/make_modified_lexicon.py "$dictsrcdir" "$tmpdir" "$promptfile"
+cp -a "$dictsrcdir"/* "$localdictsrc"
+rm "$localdictsrc"/lexicon*.txt
+kaldi-scripts/make_modified_lexicon.py --keep "$keepwords" "$dictsrcdir" "$workdir" "$promptfile"
+mv "$workdir"/lexicon*.txt "$localdictsrc"
+utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 
+cat "$workdir"/uniqued_prompt.txt | ./make_one_miscue_tolerant_lm.py \
+  --homophones "$workdir"/homophones.txt --rubbish-label "$OOV" \
+  | utils/eps2disambig.pl |\
+  fstcompile --isymbols="$langdir"/words.txt --osymbols="$langdir"/words.txt > "$langdir"/G.fst
 
+utils/mkgraph.sh "$langdir" "$modeldir" "$graphdir"

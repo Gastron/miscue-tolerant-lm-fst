@@ -29,7 +29,7 @@ def getHomophones(lexicondict):
     nodup_homophones = [list(tup) for tup in set(tuple(words) for words in homophones)]
     return nodup_homophones 
 
-def readLexiconEntries(lexiconfile, prompt):
+def readLexiconEntries(lexiconfile, prompt, keepwords):
     """ Finds in the lexiconfile the lines corresponding to words
     which appear in the prompt, returns a dict of those.
     Expects prompt to be in the same tokenisation as lexicon (case, etc.) 
@@ -38,6 +38,7 @@ def readLexiconEntries(lexiconfile, prompt):
         <WORD> <phoneme> <phoneme> <phoneme>... 
     A probability at the end is also supported, like in lexiconp.txt
     In case of multiple pronunciations, expects multiple entries for the same word. """
+    words_to_fetch = prompt + keepwords
     filtered_lexicon = {}
     with open(lexiconfile, "r") as fi:
         rawline = fi.readline()
@@ -45,7 +46,7 @@ def readLexiconEntries(lexiconfile, prompt):
             linesplit = rawline.strip().split()
             if len(linesplit) > 1: #Some word entries might not have a pronunciation listed.
                 word = linesplit[0]
-                if word in prompt:
+                if word in words_to_fetch:
                     pronunciation = " ".join(linesplit[1:])
                     filtered_lexicon.setdefault(word,[]).append(pronunciation)
             rawline = fi.readline()
@@ -70,9 +71,10 @@ def writePrompt(prompt, outfile):
 def writeLexicon(lexicondict, outfile):
     entries = [] 
     for word, pronunciations in sorted(lexicondict.items(), key=lambda x:x[0]):
-        entries.extend(word + " " + pronunciation for pronunciation in pronunciations)
+        #Last entry has to end in new line, or validate_dict_dir.pl will fail!
+        entries.extend(word + " " + pronunciation + "\n" for pronunciation in pronunciations)
     with open(outfile, "w") as fo:
-        fo.write("\n".join(entries))
+        fo.write("".join(entries))
         
 def writeHomophones(homophones, outfile):
     with open(outfile, "w") as fo:
@@ -89,21 +91,27 @@ if __name__ == "__main__":
     parser.add_argument("srcdir", help = "The source dictionary directory")
     parser.add_argument("tmpdir", help = "The directory to place the output")
     parser.add_argument("promptfile", help = "The file containing the prompt")
+    parser.add_argument("--keep", dest="keepwords", 
+            help = "Words to keep from the lexicon, even if not found in prompt, in the form they appear.")
     inputs = parser.parse_args()
 
     ###Process inputs:
     prompt = readPrompt(inputs.promptfile)
+    keepwords = inputs.keepwords.split() if inputs.keepwords is not None else []
     #The lexiconp.txt is prioritised, lexicon.txt is also tried:
     try:
         lexiconstyle = "lexiconp.txt"
         lexiconfile = os.path.join(inputs.srcdir, lexiconstyle)
-        filtered_lexicon = readLexiconEntries(lexiconfile, prompt)
+        filtered_lexicon = readLexiconEntries(lexiconfile, prompt, keepwords)
     except IOError:
         lexiconstyle = "lexicon.txt"
         lexiconfile = os.path.join(inputs.srcdir, lexiconstyle)
-        filtered_lexicon = readLexiconEntries(lexiconfile, prompt)
+        filtered_lexicon = readLexiconEntries(lexiconfile, prompt, keepwords)
     uniquefied_prompt, uniquefied_lexicon = uniqueLexiconAndPrompt(filtered_lexicon, prompt)
     homophones = getHomophones(uniquefied_lexicon)
+
+    ###Add keepwords:
+    uniquefied_lexicon.update({keepword:filtered_lexicon[keepword] for keepword in keepwords})
 
     ###Write outputs:
     promptname = os.path.basename(inputs.promptfile)
