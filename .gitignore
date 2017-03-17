@@ -2,3 +2,5 @@
 *.fst
 *.png
 *.svg
+path.sh
+utils
