@@ -37,18 +37,16 @@ trap "rm -rf $langtmpdir $localdictsrc $langdir" EXIT HUP INT PIPE TERM
 
 [ -f path.sh ] && . ./path.sh
 
-! utils/validate_dict_dir.pl "$dictsrcdir" && \
-  echo "Error validating directory $dictsrcdir" >&2 && exit 1;
-
 cp -a "$dictsrcdir"/* "$localdictsrc"
 rm "$localdictsrc"/lexicon*.txt
-kaldi-scripts/make_modified_lexicon.py --keep "$keepwords" "$dictsrcdir" "$workdir" "$promptfile"
+kaldi-scripts/make_modified_lexicon.py --keep "$keepwords" --oov "$OOV" "$dictsrcdir" "$workdir" "$promptfile"
 mv "$workdir"/lexicon*.txt "$localdictsrc"
 utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 
 cat "$workdir"/uniqued_prompt.txt | ./make_one_miscue_tolerant_lm.py \
   --homophones "$workdir"/homophones.txt --rubbish-label "$OOV" \
   | utils/eps2disambig.pl |\
-  fstcompile --isymbols="$langdir"/words.txt --osymbols="$langdir"/words.txt > "$langdir"/G.fst
+  fstcompile --isymbols="$langdir"/words.txt --osymbols="$langdir"/words.txt |\
+  fstarcsort --sort_type=ilabel > "$langdir"/G.fst
 
 utils/mkgraph.sh "$langdir" "$modeldir" "$graphdir"

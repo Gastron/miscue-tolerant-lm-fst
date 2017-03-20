@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-WORDPOS_SEPARATOR = "#"
-def uniqueLexiconAndPrompt(lexicondict, prompt):
+WORDPOS_SEPARATOR = "@"
+def uniqueLexiconAndPrompt(lexicondict, prompt, oov=None):
     """ Creates a dict with separate entries for each word in the prompt,
     even if a word is repeated. 
     Uniquefication is done by appending the position of the word in the prompt.
@@ -12,7 +12,10 @@ def uniqueLexiconAndPrompt(lexicondict, prompt):
         #Simply uniquefy by appending word position in prompt
         uniquefied_word = word + WORDPOS_SEPARATOR + str(pos)
         uniquefied_prompt.append(uniquefied_word)
-        uniquefied_lexicon[uniquefied_word] = lexicondict[word]
+        try:
+            uniquefied_lexicon[uniquefied_word] = lexicondict[word]
+        except KeyError:
+            uniquefied_lexicon[uniquefied_word] = lexicondict[oov]
     return [uniquefied_prompt, uniquefied_lexicon]
 
 def getHomophones(lexicondict):
@@ -29,11 +32,10 @@ def getHomophones(lexicondict):
     nodup_homophones = [list(tup) for tup in set(tuple(words) for words in homophones)]
     return nodup_homophones 
 
-def readLexiconEntries(lexiconfile, prompt, keepwords):
+def readLexiconEntries(lexiconfile, prompt, keepwords, demand_all=True):
     """ Finds in the lexiconfile the lines corresponding to words
     which appear in the prompt, returns a dict of those.
     Expects prompt to be in the same tokenisation as lexicon (case, etc.) 
-    Expects to find all prompt words in the lexicon, no OOV supported. 
     Expects lexiconfile to have lines in the format:
         <WORD> <phoneme> <phoneme> <phoneme>... 
     A probability at the end is also supported, like in lexiconp.txt
@@ -50,8 +52,9 @@ def readLexiconEntries(lexiconfile, prompt, keepwords):
                     pronunciation = " ".join(linesplit[1:])
                     filtered_lexicon.setdefault(word,[]).append(pronunciation)
             rawline = fi.readline()
-    if not all((word in filtered_lexicon for word in prompt)):
-        raise RuntimeError("Prompt contained out-of-vocabulary words!")
+    if demand_all and not all((word in filtered_lexicon for word in prompt)):
+        missing_words = [word for word in prompt if word not in filtered_lexicon]
+        raise ("Missing from the lexicon: \n" + "\n".join(missing_words))
     return filtered_lexicon
 
 def readPrompt(promptfile):
@@ -93,21 +96,27 @@ if __name__ == "__main__":
     parser.add_argument("promptfile", help = "The file containing the prompt")
     parser.add_argument("--keep", dest="keepwords", 
             help = "Words to keep from the lexicon, even if not found in prompt, in the form they appear.")
+    parser.add_argument("--oov", dest="oov", help="Dictionary entry to use for missing words")
     inputs = parser.parse_args()
 
     ###Process inputs:
     prompt = readPrompt(inputs.promptfile)
     keepwords = inputs.keepwords.split() if inputs.keepwords is not None else []
+    oov = inputs.oov
+    demand_comprehensive_lexicon = True
+    if oov is not None:
+        keepwords.append(oov)
+        demand_comprehensive_lexicon = False
     #The lexiconp.txt is prioritised, lexicon.txt is also tried:
     try:
         lexiconstyle = "lexiconp.txt"
         lexiconfile = os.path.join(inputs.srcdir, lexiconstyle)
-        filtered_lexicon = readLexiconEntries(lexiconfile, prompt, keepwords)
+        filtered_lexicon = readLexiconEntries(lexiconfile, prompt, keepwords, demand_comprehensive_lexicon)
     except IOError:
         lexiconstyle = "lexicon.txt"
         lexiconfile = os.path.join(inputs.srcdir, lexiconstyle)
-        filtered_lexicon = readLexiconEntries(lexiconfile, prompt, keepwords)
-    uniquefied_prompt, uniquefied_lexicon = uniqueLexiconAndPrompt(filtered_lexicon, prompt)
+        filtered_lexicon = readLexiconEntries(lexiconfile, prompt, keepwords, demand_comprehensive_lexicon)
+    uniquefied_prompt, uniquefied_lexicon = uniqueLexiconAndPrompt(filtered_lexicon, prompt, oov)
     homophones = getHomophones(uniquefied_lexicon)
 
     ###Add keepwords:
