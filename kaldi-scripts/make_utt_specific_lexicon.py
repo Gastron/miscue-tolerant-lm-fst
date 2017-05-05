@@ -83,8 +83,6 @@ def writeHomophones(homophones, outfile):
     with open(outfile, "w") as fo:
         fo.write("\n".join([" ".join(words) for words in homophones]))
 
-
-
 if __name__ == "__main__":
     import argparse
     import os.path

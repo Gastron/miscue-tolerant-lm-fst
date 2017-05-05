@@ -39,7 +39,7 @@ trap "rm -rf $langtmpdir $localdictsrc $langdir" EXIT HUP INT PIPE TERM
 
 cp -a "$dictsrcdir"/* "$localdictsrc"
 rm "$localdictsrc"/lexicon*.txt
-kaldi-scripts/make_modified_lexicon.py --keep "$keepwords" --oov "$OOV" "$dictsrcdir" "$workdir" "$promptfile"
+kaldi-scripts/make_utt_specific_lexicon.py --keep "$keepwords" --oov "$OOV" "$dictsrcdir" "$workdir" "$promptfile"
 mv "$workdir"/lexicon*.txt "$localdictsrc"
 utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 
