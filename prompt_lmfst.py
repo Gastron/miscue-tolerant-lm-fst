@@ -4,8 +4,7 @@
 # Licence: BSD-2-Clause
 
 from __future__ import print_function
-from collections import namedtuple
-
+from collections import namedtuple, defaultdict
 
 class Word(object):
     ## A word object is created for each word in the input prompt.
@@ -24,17 +23,34 @@ class Word(object):
 Arc = namedtuple("Arc", "from_state to_state in_label out_label weight")
 FinalState = namedtuple("FinalState", "state weight")
 
+# This function is just used to read the homophones file
+def readHomophones(filepath):
+    # Reads a file where on each line, words are considered homophones
+    # Returns a defaultdict that will for any word return a set of its homophones
+    # To check if two words are homophones: word in homophones[other_word]
+    homophones = defaultdict(set)
+    if filepath is None:
+        return homophones
+    with open(filepath, "r") as fi:
+        lines_split = (line.strip().split() for line in fi.readlines())
+        for line in lines_split:
+            for word in line:
+                homophones[word] = set(line) | homophones[word]
+    return homophones
+
 class PromptLMFST(object):
     ## Language model weighted finite state transducer
     ## for a prompt.
     ## Represents the prompt as a sequence of Word objects.
 
-    def __init__(self,ID=None):
+    def __init__(self,ID=None, homophones_path=None):
         self.ID = ID
         self.words = [] #Word objects
         self.states = {}
         self.state_counter = 0
         self.initialised = False
+        self.homophones = readHomophones(homophones_path) #None is an acceptable argument here.
+        self.labels_by_state = {}
 
     def addNextWord(self, label):
         # Use this to add words one by one into the PromptLMFST from a prompt text
@@ -62,8 +78,15 @@ class PromptLMFST(object):
         self.states[self.state_counter] = []
         return self.state_counter
 
+    def homophoneArcExists(self, from_state, label):
+        # Returns true if an arc already exists from the given state
+        # with a label that is a homophone of the given label
+        labels_from_state = set(getattr(item, "in_label", None) for item in self.states[from_state])
+        return any(label in self.homophones[other_label] for other_label in labels_from_state)
+
     def addArc(self, from_state, to_state, in_label, out_label, weight):
-        self.states[from_state].append(Arc(from_state, to_state, in_label, out_label, weight))
+        if not self.homophoneArcExists(from_state, in_label):
+            self.states[from_state].append(Arc(from_state, to_state, in_label, out_label, weight))
 
     def addFinalState(self, state, weight):
         self.states[state].append(FinalState(state, weight))
@@ -88,10 +111,9 @@ class PromptLMFST(object):
         for state in self.states.values():
             seen_labels = {}
             for item in state:
-                if has_attr(item, "in_label"):
-                    if item.in_label in seen_labels:
-                        return False
-                    else:
-                        seen_labels[item.in_label] = True
+                if getattr(item, "in_label", None) in seen_labels:
+                    return False
+                else:
+                    seen_labels[item.in_label] = True
         return True
 

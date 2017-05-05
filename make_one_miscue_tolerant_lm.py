@@ -4,7 +4,6 @@ import prompt_lmfst
 import argparse
 import sys
 import math
-from collections import Counter, defaultdict
 
 parser = argparse.ArgumentParser(description="""
         This script creates a reading miscue tolerant language model,
@@ -33,7 +32,7 @@ parser = argparse.ArgumentParser(description="""
 # In that semiring the weight (==the cost) of a transition is a
 # negative logarithm of the probability.
 weights = {
-        "Correct":      100.,    #The correct next word
+        "Correct":      1000.,    #The correct next word
         "Rubbish":      5.,      #Speech-like noises, hesitations, etc.
         "Skip":         10.,     #Jump forward one word
         "Repeat":       30.,     #Jump backward one word
@@ -43,7 +42,7 @@ weights = {
                                 #P(jump) = d^n * <jump_relative_probability>, n == number of words jumped over
         "Truncation":   5.,      #An incomplete pronounciation
         "PrematureEnd": 3.,      #Unexpected end of utterance
-        "FinalState":   100.     #The probability that the utterance ends at the correct point. 
+        "FinalState":   1000.     #The probability that the utterance ends at the correct point. 
                                 #There could also be repetition, rubbish, etc.
 }
 
@@ -94,29 +93,23 @@ def addRubbishPaths(p_fst, weights):
             special_labels["Rubbish"], special_labels["Rubbish"],
             weights["Rubbish"])
 
-def addSkipPaths(p_fst, weights, homophones):
+def addSkipPaths(p_fst, weights):
     # This will loop over all but the last word.
     # It makes no sense to skip the last word; that should always mean a
     # premature end.
     if len(p_fst.words) > 1:
         for word, next_word in zip(p_fst.words, p_fst.words[1:]):
-            # Don't add skip if a homophone is next.
-            # This way, skips are always notated at the end of a sequence of homophones.
-            if word.label not in homophones[next_word.label]:
-                p_fst.addArc(word.start, next_word.final,
-                        next_word.label, next_word.label,
-                        weights["Skip"])
+            p_fst.addArc(word.start, next_word.final,
+                    next_word.label, next_word.label,
+                    weights["Skip"])
 
-def addRepeatPaths(p_fst, weights, homophones):
+def addRepeatPaths(p_fst, weights):
     if len(p_fst.words) > 1:
         # This will loop over all but the last word:
         for word, next_word in zip(p_fst.words, p_fst.words[1:]):
-            # Don't add repeat if a homophone is next in the correct sequence.
-            # This way, repeats are always notated at the end of a sequence of homophones.
-            if word.label not in homophones[next_word.label]:
-                p_fst.addArc(word.final, word.final,
-                        word.label, word.label,
-                        weights["Repeat"])
+            p_fst.addArc(word.final, word.final,
+                    word.label, word.label,
+                    weights["Repeat"])
     # Then the last word:
     p_fst.addArc(p_fst.words[-1].final, p_fst.words[-1].final,
             p_fst.words[-1].label, p_fst.words[-1].label,
@@ -128,45 +121,36 @@ def addPrematureEnds(p_fst, weights):
     for word in p_fst.words:
         p_fst.addFinalState(word.start, weights["PrematureEnd"])
 
-def addJumpsBackward(p_fst, weights, homophones):
+def addJumpsBackward(p_fst, weights):
     # This will care of all but the last word 
     # (it's simpler code to add jumps from the start state, so we know the next correct word)
     for i, word, in enumerate(p_fst.words):
         for n, prev_word in enumerate(reversed(p_fst.words[:i])):
             # n = number of words jumped over
-            # The latest word is special; we add a repeat arc, not a jump back arc.
             if n==0:
-                continue
-            # If the jump backward would consume a homophone of the correct next word, 
-            # assume that the correct step was taken. This is the sane choice.
-            if prev_word.label not in homophones[word.label]:
-                decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpBackward"]
-                p_fst.addArc(word.start, prev_word.final,
-                        prev_word.label, prev_word.label,
-                        decayed_weight)
-    # We have to deal with the last word separately
-    for n, prev_word in enumerate(reversed(p_fst.words[:-1])):
-        if prev_word.label not in homophones[word.label]:
+                continue # The latest word is special; we add a repeat arc, not a jump back arc.
             decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpBackward"]
-            p_fst.addArc(p_fst.words[-1].final, prev_word.final,
+            p_fst.addArc(word.start, prev_word.final,
                     prev_word.label, prev_word.label,
                     decayed_weight)
+    # We have to deal with the last word separately
+    for n, prev_word in enumerate(reversed(p_fst.words[:-1])):
+        decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpBackward"]
+        p_fst.addArc(p_fst.words[-1].final, prev_word.final,
+                prev_word.label, prev_word.label,
+                decayed_weight)
 
-def addJumpsForward(p_fst, weights, homophones):
+def addJumpsForward(p_fst, weights):
     # It's again simpler to add jumps from the start states, so we know the next correct word)
     for i, word, in enumerate(p_fst.words):
         for n, later_word in enumerate(p_fst.words[i:]):
             # n = number of words jumped over
-            # The next word is special; we add a skip arc, not a jump forward arc.
             if n == 0:
-                continue
-            # If the jump forward would consume a homophone of the correct next word,
-            # assume that the correct step was taken. This is again the sane choice.
-            if later_word.label not in homophones[word.label]:
-                decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpForward"]
-                p_fst.addArc(word.start, later_word.final,
-                        later_word.label, later_word.label,
-                        decayed_weight)
+                continue # The next word is special; we add a skip arc, not a jump forward arc.
+            decayed_weight = weights["LongJumpDecay"] ** n * weights["JumpForward"]
+            p_fst.addArc(word.start, later_word.final,
+                    later_word.label, later_word.label,
+                    decayed_weight)
 
 def convertRelativeProbs(p_fst):
     # First normalises the weights in relative probabilities into true
@@ -183,23 +167,6 @@ def convertRelativeProbs(p_fst):
             normalised_leaves.append(leaf._replace(weight = new_weight))
         p_fst.states[state_num] = normalised_leaves
 
-# This function is just used to read the homophones file
-def readHomophones(filepath):
-    # Reads a file where on each line, words are considered homophones
-    # Returns a defaultdict that will for any word return a set of its homophones
-    # This does not include the word itself.
-    # To check if two words are homophones: word in homophones[other_word]
-    homophones = defaultdict(set)
-    if filepath is None:
-        return homophones
-    with open(filepath, "r") as fi:
-        lines_split = (line.strip().split() for line in fi.readlines())
-        for line in lines_split:
-            for word in line:
-                homophones[word] = set(line)-set(word)
-    return homophones
-
-
 ## Now we just parse arguments and run the functions.
             
 parser.add_argument('--homophones', nargs="?", help=
@@ -211,11 +178,10 @@ parser.add_argument('--homophones', nargs="?", help=
 parser.add_argument('--rubbish-label', dest="rubbish_label", nargs="?", help=
         """The label to use for Rubbish, i.e. spoken noise""")
 args = parser.parse_args()
-homophones = readHomophones(args.homophones)
 if args.rubbish_label is not None:
     special_labels["Rubbish"] = args.rubbish_label
 
-fst = prompt_lmfst.PromptLMFST()
+fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
 prompt = sys.stdin.readline()
 prompt_tokenised = prompt.strip().split()
 if not prompt_tokenised:
@@ -223,10 +189,11 @@ if not prompt_tokenised:
 fst.addWordSequence(prompt_tokenised)
 addCorrectPaths(fst, weights)
 addRubbishPaths(fst, weights)
-addSkipPaths(fst, weights, homophones)
-addRepeatPaths(fst, weights, homophones)
+addSkipPaths(fst, weights)
+addRepeatPaths(fst, weights)
 addPrematureEnds(fst, weights)
-addJumpsBackward(fst, weights, homophones)
+addJumpsBackward(fst, weights)
+addJumpsForward(fst, weights)
 
 convertRelativeProbs(fst)
 print(fst.inText())

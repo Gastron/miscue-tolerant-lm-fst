@@ -14,7 +14,7 @@ echo "Testing homophones"
 echo "Test string: $test_string"
 echo
 
-
+echo -e "two too\ncarat carrot\n" > tests/homophones.txt
 echo $test_string | ./make_one_miscue_tolerant_lm.py --homophones tests/homophones.txt |\
     fstcompile --isymbols=$sym_table --osymbols=$sym_table > ${outname}.fst
 
