@@ -51,7 +51,7 @@ weights = {
 special_labels = {
         "Epsilon":      "<eps>",
         "Rubbish":      "[RUB]",
-        "Skip":         "[SKP]",
+        "Truncation":   "[TRUNC]:",
 }
 
 
@@ -152,6 +152,13 @@ def addJumpsForward(p_fst, weights):
                     later_word.label, later_word.label,
                     decayed_weight)
 
+def addTruncations(p_fst, weights):
+    for word in p_fst.words:
+        p_fst.addArc(word.start, word.start,
+                special_labels["Truncation"]+word.label, #note the truncation symbol concatenated with the word
+                special_labels["Truncation"]+word.label, #so it should be easy to separate, like trunc:word
+                weights["Truncation"])
+
 def convertRelativeProbs(p_fst):
     # First normalises the weights in relative probabilities into true
     # probabilities, then converts to negative logarithms.
@@ -168,7 +175,6 @@ def convertRelativeProbs(p_fst):
         p_fst.states[state_num] = normalised_leaves
 
 ## Now we just parse arguments and run the functions.
-            
 parser.add_argument('--homophones', nargs="?", help=
         """File that contains a list of homophones. 
         In each line, words are considered homophones.
@@ -177,9 +183,13 @@ parser.add_argument('--homophones', nargs="?", help=
         carat carrot""")
 parser.add_argument('--rubbish-label', dest="rubbish_label", nargs="?", help=
         """The label to use for Rubbish, i.e. spoken noise""")
+parser.add_argument('--truncation-label', dest="truncation_label", nargs="?", help=
+        """The label to use for Truncation, concatenated with the word, like [TRUNC]:label""")
 args = parser.parse_args()
 if args.rubbish_label is not None:
     special_labels["Rubbish"] = args.rubbish_label
+if args.truncation_label is not None:
+    special_labels["Truncation"] = args.truncation_label
 
 fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
 prompt = sys.stdin.readline()

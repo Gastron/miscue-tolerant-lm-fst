@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
-def getHomophones(lexicondict):
+ENCODING="utf8"
+
+def getHomophones(lexicondict, allwords):
     """ Returns a list of lists of homophones for a given lexicon """
     #Indexed by pronunciations, gives all corresponding words, i.e. gives homophones:
     words_by_pronunciation = {}
-    for word in lexicondict.keys():
+    for word in allwords:
         for pronunciation in lexicondict[word]:
             words_by_pronunciation.setdefault(pronunciation,[]).append(word)
     #The homophones list could also be simply words_by_pronunciation.values()
@@ -22,33 +24,51 @@ def readLexiconEntries(lexiconfile):
     In case of multiple pronunciations, expects multiple entries for the same word. """
     lexicon = {}
     with open(lexiconfile, "r") as fi:
-        rawline = fi.readline()
+        rawline = fi.readline().decode(ENCODING)
         while rawline:
             linesplit = rawline.strip().split()
             word = linesplit[0]
             # Some word entries might not have a pronunciation listed.
             if len(linesplit) > 1: 
-                pronunciation = " ".join(linesplit[1:])
+                pronunciation = u" ".join(linesplit[1:])
                 lexicon.setdefault(word,[]).append(pronunciation)
             else: 
-                lexicon.setdefault(word,[]).append("")
-            rawline = fi.readline()
+                pass #ie. exclude from lexicon dict: it can then be treated with OOV addition.
+            rawline = fi.readline().decode(ENCODING)
     return lexicon 
 
-def addOOVs(texts, lexicon, oov):
+def addOOVs(textwords, lexicon, oov):
     """ Adds the pronunciation of oov as the pronunciation of each
     out-of-vocabulary word in the texts """
-    for text in texts.values():
-        for word in text:
+    for word in textwords:
+        try:
             if word not in lexicon:
                 print("Adding pronunciation "+repr(lexicon[oov])+" for OOV word "+word)
                 lexicon[word] = lexicon[oov]
+        except:
+            print(word)
+            raise
 
+def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min_left_phonemes=1):
+    """ Adds truncated lexicon entries for all textwords into the lexicon inplace.
+    Returns the added words as a set. 
 
-def extendLexicon(lexicondict):
-    """ Adds miscues """
-    #TODO
-    pass
+    Note: LEXICON_CONSTANT is used here to keep compatibility with both lexiconp.txt and lexicon.txt
+    formats. It is either 1 or 0, as lexicon[uttid][0] can be a weight or the first phoneme of the
+    pronunciation.
+    """
+    truncation_words = set()
+    for word in textwords:
+        for pronunciation in lexicon[word]:
+            pronunciation_list = pronunciation.split()
+            if len(pronunciation_list) - LEXICON_CONSTANT < min_cut_phonemes + min_left_phonemes:
+                continue
+            for upto_pos in range(min_left_phonemes + LEXICON_CONSTANT, len(pronunciation_list) - min_cut_phonemes):
+                truncation = u" ".join(pronunciation_list[:upto_pos])
+                truncation_word = truncation_label + word
+                lexicon.setdefault(truncation_word, []).append(truncation)
+                truncation_words.add(truncation_word)
+    return truncation_words
 
 def readText(textfile):
     """ Reads a Kaldi style text file containing all the prompts.
@@ -57,26 +77,39 @@ def readText(textfile):
     """
     texts = {}
     with open(textfile, "r") as fi:
-        rawline = fi.readline()
+        rawline = fi.readline().decode(ENCODING)
         while rawline:
             linesplit = rawline.strip().split()
             uttid = linesplit[0]
             # Expect to have at least one word for each utterance
             texts[uttid] = linesplit[1:]
-            rawline = fi.readline()
+            rawline = fi.readline().decode(ENCODING)
     return texts
+
+def getAllTextWords(texts):
+    """ Returns a set of all the words in the given texts """
+    return reduce(lambda x,y: x | set(y), texts.values(), set()) #union of all the texts as sets
+        
+def getFilteredLexicon(lexicondict, allwords):
+    """ Returns a lexicon with just the necessary words.
+    Assumes all wanted keys exist in the given lexicon """
+    return { word: lexicondict[word] for word in allwords }
         
 def writeLexicon(lexicondict, outfile):
     entries = [] 
-    for word, pronunciations in sorted(lexicondict.items(), key=lambda x:x[0]):
+    for word, pronunciations in lexicondict.items():
         #Last entry has to end in new line, or validate_dict_dir.pl will fail!
         entries.extend(word + " " + pronunciation + "\n" for pronunciation in pronunciations)
+    #For example truncations can result in duplicates, remove them:
+    entries = sorted(list(set(entries)), key=lambda x:x[0])
+    outunicode = u"".join(entries)
     with open(outfile, "w") as fo:
-        fo.write("".join(entries))
-        
+        fo.write(outunicode.encode(ENCODING))
+
 def writeHomophones(homophones, outfile):
+    outunicode = u"\n".join([u" ".join(words) for words in homophones])
     with open(outfile, "w") as fo:
-        fo.write("\n".join([" ".join(words) for words in homophones]))
+        fo.write(outunicode.encode(ENCODING))
 
 if __name__ == "__main__":
     import argparse
@@ -88,23 +121,32 @@ if __name__ == "__main__":
     parser.add_argument("tmpdir", help = "The directory to place the output")
     parser.add_argument("textfile", help = "The Kaldi style text file")
     parser.add_argument("--oov", dest="oov", help="Dictionary entry to use for missing words")
+    parser.add_argument("--truncation-label", dest="truncation_label", help="Prefix for truncation entries in the lexicon")
     inputs = parser.parse_args()
 
     #The lexiconp.txt is prioritised, lexicon.txt is also tried:
     try:
         lexiconstyle = "lexiconp.txt"
+        LEXICON_CONSTANT = 1 #the pronunciation entry is lexicon[uttid][1:]
         lexiconfile = os.path.join(inputs.srcdir, lexiconstyle)
         lexicon = readLexiconEntries(lexiconfile)
     except IOError:
         lexiconstyle = "lexicon.txt"
+        LEXICON_CONSTANT = 0 #the pronunciation entry is lexicon[uttid][0:] 
         lexiconfile = os.path.join(inputs.srcdir, lexiconstyle)
         lexicon = readLexiconEntries(lexiconfile)
     texts = readText(inputs.textfile)
+    textwords = getAllTextWords(texts)
     if inputs.oov is not None: 
-        #Modifies lexicon in place:
-        addOOVs(texts, lexicon, inputs.oov)
-    extendLexicon(lexicon)
-    homophones = getHomophones(lexicon)
+        #Modifies lexicon in place, note this does not add new words:
+        addOOVs(textwords, lexicon, inputs.oov.decode(ENCODING))
+    if inputs.oov is not None:
+        #Modifies lexicon in place, returns a set of all used word entries (sets are immutable)
+        truncwords = addTruncations(lexicon, textwords, inputs.truncation_label.decode(ENCODING))
+    allwords = truncwords | textwords #union 
+    filtered_lexicon = getFilteredLexicon(lexicon, allwords)
+    #This must of course be done last:
+    homophones = getHomophones(filtered_lexicon, allwords)
 
     ###Write outputs:
     lexiconout = os.path.join(inputs.tmpdir, lexiconstyle)
