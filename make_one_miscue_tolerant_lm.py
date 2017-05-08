@@ -68,7 +68,7 @@ def addCorrectPaths(p_fst, weights):
         p_fst.addArc(word.start, word.final, word.label, word.label, weights["Correct"])
     p_fst.addFinalState(p_fst.words[-1].final, weights["FinalState"])
 
-def addRubbishPaths(p_fst, weights):
+def addRubbishPaths(p_fst, weights, special_labels):
     # Rubbish means speech like sounds here. This can model e.g. hesitation sounds ("umm") or 
     # a failed pronunciation
     # We add a path for rubbish both to be inserted before a word and to be substituted for the word.
@@ -152,7 +152,7 @@ def addJumpsForward(p_fst, weights):
                     later_word.label, later_word.label,
                     decayed_weight)
 
-def addTruncations(p_fst, weights):
+def addTruncations(p_fst, weights, special_labels):
     for word in p_fst.words:
         p_fst.addArc(word.start, word.start,
                 special_labels["Truncation"]+word.label, #note the truncation symbol concatenated with the word
@@ -198,12 +198,13 @@ if not prompt_tokenised:
     raise ValueError("Prompt empty!")
 fst.addWordSequence(prompt_tokenised)
 addCorrectPaths(fst, weights)
-addRubbishPaths(fst, weights)
+addRubbishPaths(fst, weights, special_labels)
 addSkipPaths(fst, weights)
 addRepeatPaths(fst, weights)
 addPrematureEnds(fst, weights)
 addJumpsBackward(fst, weights)
 addJumpsForward(fst, weights)
+addTruncations(fst, weights, special_labels)
 
 convertRelativeProbs(fst)
 print(fst.inText())
