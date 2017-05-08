@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 ENCODING="utf8"
+IMPORTANT_WORDS = set([])
 
 def getHomophones(lexicondict, allwords):
     """ Returns a list of lists of homophones for a given lexicon """
@@ -111,6 +112,11 @@ def writeHomophones(homophones, outfile):
     with open(outfile, "w") as fo:
         fo.write(outunicode.encode(ENCODING))
 
+def writeTruncations(truncations, outfile):
+    outunicode = u"\n".join(truncations)
+    with open(outfile, "w") as fo:
+        fo.write(outunicode.encode(ENCODING))
+
 if __name__ == "__main__":
     import argparse
     import os.path
@@ -138,18 +144,24 @@ if __name__ == "__main__":
     texts = readText(inputs.textfile)
     textwords = getAllTextWords(texts)
     if inputs.oov is not None: 
+        print("Adding pronunciation for any missing words from the pronunciation of: "+inputs.oov)
+        oov_entry = inputs.oov.decode(ENCODING)
         #Modifies lexicon in place, note this does not add new words:
-        addOOVs(textwords, lexicon, inputs.oov.decode(ENCODING))
-    if inputs.oov is not None:
+        addOOVs(textwords, lexicon, oov_entry)
+        IMPORTANT_WORDS.add(oov_entry)
+    if inputs.truncation_label is not None:
+        print("Adding truncations with truncation prefix: "+inputs.truncation_label)
         #Modifies lexicon in place, returns a set of all used word entries (sets are immutable)
         truncwords = addTruncations(lexicon, textwords, inputs.truncation_label.decode(ENCODING))
-    allwords = truncwords | textwords #union 
-    filtered_lexicon = getFilteredLexicon(lexicon, allwords)
+    words_to_keep = truncwords | textwords | IMPORTANT_WORDS #union 
+    filtered_lexicon = getFilteredLexicon(lexicon, words_to_keep)
     #This must of course be done last:
-    homophones = getHomophones(filtered_lexicon, allwords)
+    homophones = getHomophones(filtered_lexicon, words_to_keep)
 
     ###Write outputs:
     lexiconout = os.path.join(inputs.tmpdir, lexiconstyle)
     homophoneout = os.path.join(inputs.tmpdir, "homophones.txt")
-    writeLexicon(lexicon, lexiconout)
+    truncwordout = os.path.join(inputs.tmpdir, "truncations.txt")
+    writeLexicon(filtered_lexicon, lexiconout)
     writeHomophones(homophones, homophoneout)
+    writeTruncations(truncwords, truncwordout)

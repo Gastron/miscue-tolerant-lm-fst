@@ -152,12 +152,13 @@ def addJumpsForward(p_fst, weights):
                     later_word.label, later_word.label,
                     decayed_weight)
 
-def addTruncations(p_fst, weights, special_labels):
+def addTruncations(p_fst, weights, special_labels, truncated):
     for word in p_fst.words:
-        p_fst.addArc(word.start, word.start,
-                special_labels["Truncation"]+word.label, #note the truncation symbol concatenated with the word
-                special_labels["Truncation"]+word.label, #so it should be easy to separate, like trunc:word
-                weights["Truncation"])
+        if word in truncated: #Some words may not have truncations. For example, words of just one phoneme.
+            p_fst.addArc(word.start, word.start,
+                    special_labels["Truncation"]+word.label, #note the truncation symbol concatenated with the word
+                    special_labels["Truncation"]+word.label, #so it should be easy to separate, like trunc:word
+                    weights["Truncation"])
 
 def convertRelativeProbs(p_fst):
     # First normalises the weights in relative probabilities into true
@@ -174,6 +175,12 @@ def convertRelativeProbs(p_fst):
             normalised_leaves.append(leaf._replace(weight = new_weight))
         p_fst.states[state_num] = normalised_leaves
 
+def readTruncations(truncationsfile):
+    """ Reads truncations from the given file and returns them as a set """
+    with open(truncationsfile, "r") as fi:
+        truncationslist = fi.read().split()
+    return set(truncationslist)
+
 ## Now we just parse arguments and run the functions.
 parser.add_argument('--homophones', nargs="?", help=
         """File that contains a list of homophones. 
@@ -181,6 +188,9 @@ parser.add_argument('--homophones', nargs="?", help=
         e.g. 
         too two
         carat carrot""")
+parser.add_argument('--truncations', nargs="?", help=
+        """File that contains a list of words that have truncations in the dictionary.
+            On each line is one word""")
 parser.add_argument('--rubbish-label', dest="rubbish_label", nargs="?", help=
         """The label to use for Rubbish, i.e. spoken noise""")
 parser.add_argument('--truncation-label', dest="truncation_label", nargs="?", help=
@@ -204,7 +214,9 @@ addRepeatPaths(fst, weights)
 addPrematureEnds(fst, weights)
 addJumpsBackward(fst, weights)
 addJumpsForward(fst, weights)
-addTruncations(fst, weights, special_labels)
+if args.truncations is not None:
+    truncated_words = readTruncations(args.truncations)
+    addTruncations(fst, weights, special_labels, truncated_words)
 
 convertRelativeProbs(fst)
 print(fst.inText())

@@ -23,6 +23,9 @@ shift $((OPTIND - 1))
 
 if [ "$#" -ne 4 ]; then
   echo "Usage: $0 <dictsrcdir> <modeldir> <datadir> <workdir>" >&2 
+  echo "Options:"
+  echo "-o <OOV>                  Entry to use as pronunciation for oov words"
+  echo "-t <truncation-prefix>    Prefix for truncated words in lexicon" 
   exit 1
 fi
 
@@ -52,7 +55,7 @@ rm "$localdictsrc"/lexicon*.txt
 kaldi-scripts/make_extended_lexicon.py --oov "$OOV" --truncation-label "$truncation_symbol" \
   "$dictsrcdir" "$localdictsrc" "$textfile"
 utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
-cp "$localdictsrc"/homophones.txt "$langdir"
+cp "$localdictsrc"/{homophones,truncations}.txt "$langdir"
 rm -rf "$langtmpdir"
 
 scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
@@ -72,7 +75,8 @@ cat "$textfile" | while read promptline; do
   mkdir -p "$promptdir"
   echo "$uttid" #Header
   echo "$prompt"  | ./make_one_miscue_tolerant_lm.py \
-    --homophones "$langdir"/homophones.txt --rubbish-label "$OOV" |\
+    --homophones "$langdir"/homophones.txt --rubbish-label "$OOV" \
+    --truncations "$langdir"/truncations.txt |\
     utils/eps2disambig.pl |\
     utils/sym2int.pl -f 3-4 "$langdir"/words.txt >&1
   echo #empty line as separator
