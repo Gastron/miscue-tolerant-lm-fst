@@ -13,19 +13,25 @@ set -o pipefail
 
 OOV="<SPOKEN_NOISE>"
 truncation_symbol="[TRUNC]:"
-while getopts "o:t:" OPTNAME; do
+scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
+while getopts "o:t:s:" OPTNAME; do
   case "$OPTNAME" in
     o) OOV="$OPTARG";;
     t) truncation_symbol="$OPTARG";;
+    s) scale_opts="$OPTARG";;
   esac
 done
 shift $((OPTIND - 1))
+
+silprob=0.7 #the default is 0.5, this should reflect higher hesitation time.
 
 if [ "$#" -ne 4 ]; then
   echo "Usage: $0 <dictsrcdir> <modeldir> <datadir> <workdir>" >&2 
   echo "Options:"
   echo "-o <OOV>                  Entry to use as pronunciation for oov words"
   echo "-t <truncation-prefix>    Prefix for truncated words in lexicon" 
+  echo "-s <scale-opts>           Scale options to pass to kaldi. default:"
+  echo "                            --transition-scale=1.0 --self-loop-scale=0.1"
   exit 1
 fi
 
@@ -54,11 +60,10 @@ rm "$localdictsrc"/lexicon*.txt
 
 kaldi-scripts/make_extended_lexicon.py --oov "$OOV" --truncation-label "$truncation_symbol" \
   "$dictsrcdir" "$localdictsrc" "$textfile"
-utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
+utils/prepare_lang.sh --sil-prob "$silprob" "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 cp "$localdictsrc"/{homophones,truncations}.txt "$langdir"
 rm -rf "$langtmpdir"
 
-scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
 
 graphsdir="$modeldir/graphs_mtlm_"$(basename "$datadir")
 graphsscp="$graphsdir/HCLG.fsts.scp"
@@ -76,12 +81,12 @@ cat "$textfile" | while read promptline; do
   echo "$uttid" #Header
   echo "$prompt"  | ./make_one_miscue_tolerant_lm.py \
     --homophones "$langdir"/homophones.txt --rubbish-label "$OOV" \
-    --truncations "$langdir"/truncations.txt |\
+    --truncation-label "$truncation_symbol" --truncations "$langdir"/truncations.txt |\
     utils/eps2disambig.pl |\
     utils/sym2int.pl -f 3-4 "$langdir"/words.txt >&1
   echo #empty line as separator
 done |\
-  compile-train-graphs-fsts $scale_opts --read-disambig-syms="$langdir"/phones/disambig.int \
+  compile-train-graphs-fsts --batch-size=500 $scale_opts --read-disambig-syms="$langdir"/phones/disambig.int \
     "$modeldir"/tree $modeldir/final.mdl "$langdir"/L_disambig.fst ark:- \
   ark,scp:"$graphsdir"/HCLG.fsts,"$graphsscp" 
 

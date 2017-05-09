@@ -152,12 +152,13 @@ def addJumpsForward(p_fst, weights):
                     later_word.label, later_word.label,
                     decayed_weight)
 
-def addTruncations(p_fst, weights, special_labels, truncated):
+def addTruncations(p_fst, weights, special_labels, truncations):
     for word in p_fst.words:
-        if word in truncated: #Some words may not have truncations. For example, words of just one phoneme.
+        truncation_entry = special_labels["Truncation"]+word.label #we must build the entry manually here.
+        if truncation_entry in truncations: #Some words may not have truncations. For example, words of just one phoneme.
             p_fst.addArc(word.start, word.start,
-                    special_labels["Truncation"]+word.label, #note the truncation symbol concatenated with the word
-                    special_labels["Truncation"]+word.label, #so it should be easy to separate, like trunc:word
+                    truncation_entry,
+                    truncation_entry, 
                     weights["Truncation"])
 
 def convertRelativeProbs(p_fst):

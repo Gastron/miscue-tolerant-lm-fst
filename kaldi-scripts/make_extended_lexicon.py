@@ -50,7 +50,7 @@ def addOOVs(textwords, lexicon, oov):
             print(word)
             raise
 
-def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min_left_phonemes=1):
+def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min_left_phonemes=2):
     """ Adds truncated lexicon entries for all textwords into the lexicon inplace.
     Returns the added words as a set. 
 
@@ -68,7 +68,7 @@ def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min
                 truncation = u" ".join(pronunciation_list[:upto_pos])
                 truncation_word = truncation_label + word
                 lexicon.setdefault(truncation_word, []).append(truncation)
-                truncation_words.add(word)
+                truncation_words.add(truncation_word)
     return truncation_words
 
 def readText(textfile):
