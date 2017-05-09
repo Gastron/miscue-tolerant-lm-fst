@@ -68,7 +68,7 @@ def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min
                 truncation = u" ".join(pronunciation_list[:upto_pos])
                 truncation_word = truncation_label + word
                 lexicon.setdefault(truncation_word, []).append(truncation)
-                truncation_words.add(truncation_word)
+                truncation_words.add(word)
     return truncation_words
 
 def readText(textfile):
