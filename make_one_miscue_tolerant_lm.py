@@ -183,6 +183,11 @@ def readTruncations(truncationsfile):
     return set(truncationslist)
 
 ## Now we just parse arguments and run the functions.
+parser.add_argument('--correct-word-boost', dest="correct_boost", 
+        nargs="?", type=float,
+        help="""Amount to multiply the correct words probability by.
+        Lower correct word probability will probably spot more miscues,
+        but also have more false positives.""")
 parser.add_argument('--homophones', nargs="?", help=
         """File that contains a list of homophones. 
         In each line, words are considered homophones.
@@ -201,6 +206,8 @@ if args.rubbish_label is not None:
     special_labels["Rubbish"] = args.rubbish_label
 if args.truncation_label is not None:
     special_labels["Truncation"] = args.truncation_label
+if args.correct_boost is not None:
+    weights["Correct"] *= args.correct_boost #Argparse will produce a list of one float.
 
 fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
 prompt = sys.stdin.readline()

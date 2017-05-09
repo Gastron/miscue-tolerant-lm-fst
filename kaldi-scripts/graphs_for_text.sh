@@ -14,11 +14,13 @@ set -o pipefail
 OOV="<SPOKEN_NOISE>"
 truncation_symbol="[TRUNC]:"
 scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
-while getopts "o:t:s:" OPTNAME; do
+correct_boost=1.0
+while getopts "o:t:s:b:" OPTNAME; do
   case "$OPTNAME" in
     o) OOV="$OPTARG";;
     t) truncation_symbol="$OPTARG";;
     s) scale_opts="$OPTARG";;
+    b) correct_boost="$OPTARG";;
   esac
 done
 shift $((OPTIND - 1))
@@ -28,10 +30,11 @@ silprob=0.7 #the default is 0.5, this should reflect higher hesitation time.
 if [ "$#" -ne 4 ]; then
   echo "Usage: $0 <dictsrcdir> <modeldir> <datadir> <workdir>" >&2 
   echo "Options:"
-  echo "-o <OOV>                  Entry to use as pronunciation for oov words"
-  echo "-t <truncation-prefix>    Prefix for truncated words in lexicon" 
+  echo "-o <OOV>                  Entry to use as pronunciation for oov words, default: <SPOKEN_NOISE>"
+  echo "-t <truncation-prefix>    Prefix for truncated words in lexicon, deufault: [TRUNC]:" 
   echo "-s <scale-opts>           Scale options to pass to kaldi. default:"
   echo "                            --transition-scale=1.0 --self-loop-scale=0.1"
+  echo "-b <float>                Multiply the probability of the correct words by float, default 1.0 (no boost)"
   exit 1
 fi
 
