@@ -82,7 +82,7 @@ cat "$textfile" | while read promptline; do
   promptdir="$workdir/$uttid"
   mkdir -p "$promptdir"
   echo "$uttid" #Header
-  echo "$prompt"  | ./make_one_miscue_tolerant_lm.py \
+  echo "$prompt"  | ./make_one_miscue_tolerant_lm.py --correct-word-boost $correct_boost \
     --homophones "$langdir"/homophones.txt --rubbish-label "$OOV" \
     --truncation-label "$truncation_symbol" --truncations "$langdir"/truncations.txt |\
     utils/eps2disambig.pl |\
@@ -96,6 +96,3 @@ done |\
 cp -a "$langdir"/* "$graphsdir"
 am-info --print-args=false "$modeldir/final.mdl" |\
  grep pdfs | awk '{print $NF}' > "$graphsdir/num_pdfs"
-
-#Cleanup the separate graph directories:
-rm -rf "$graphsdir"/TMP_*
