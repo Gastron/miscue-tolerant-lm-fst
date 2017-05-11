@@ -39,11 +39,11 @@ trap "rm -rf $langtmpdir $localdictsrc $langdir" EXIT HUP INT PIPE TERM
 
 cp -a "$dictsrcdir"/* "$localdictsrc"
 rm "$localdictsrc"/lexicon*.txt
-kaldi-scripts/make_utt_specific_lexicon.py --keep "$keepwords" --oov "$OOV" "$dictsrcdir" "$workdir" "$promptfile"
+miscue-tolerant-lm-fst/kaldi-scripts/make_utt_specific_lexicon.py --keep "$keepwords" --oov "$OOV" "$dictsrcdir" "$workdir" "$promptfile"
 mv "$workdir"/lexicon*.txt "$localdictsrc"
 utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 
-cat "$workdir"/uniqued_prompt.txt | ./make_one_miscue_tolerant_lm.py \
+cat "$workdir"/uniqued_prompt.txt | miscue-tolerant-lm-fst/make_one_miscue_tolerant_lm.py \
   --homophones "$workdir"/homophones.txt --rubbish-label "$OOV" \
   | utils/eps2disambig.pl |\
   fstcompile --isymbols="$langdir"/words.txt --osymbols="$langdir"/words.txt |\

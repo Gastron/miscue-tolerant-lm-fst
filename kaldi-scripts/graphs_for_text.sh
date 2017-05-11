@@ -61,7 +61,7 @@ trap "rm -rf $langtmpdir $localdictsrc $langdir" EXIT HUP INT PIPE TERM
 cp -a "$dictsrcdir"/* "$localdictsrc"
 rm "$localdictsrc"/lexicon*.txt
 
-kaldi-scripts/make_extended_lexicon.py --oov "$OOV" --truncation-label "$truncation_symbol" \
+miscue-tolerant-lm-fst/kaldi-scripts/make_extended_lexicon.py --oov "$OOV" --truncation-label "$truncation_symbol" \
   "$dictsrcdir" "$localdictsrc" "$textfile"
 utils/prepare_lang.sh --sil-prob "$silprob" "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 cp "$localdictsrc"/{homophones,truncations}.txt "$langdir"
@@ -82,7 +82,7 @@ cat "$textfile" | while read promptline; do
   promptdir="$workdir/$uttid"
   mkdir -p "$promptdir"
   echo "$uttid" #Header
-  echo "$prompt"  | ./make_one_miscue_tolerant_lm.py --correct-word-boost $correct_boost \
+  echo "$prompt"  | miscue-tolerant-lm-fst/make_one_miscue_tolerant_lm.py --correct-word-boost $correct_boost \
     --homophones "$langdir"/homophones.txt --rubbish-label "$OOV" \
     --truncation-label "$truncation_symbol" --truncations "$langdir"/truncations.txt |\
     utils/eps2disambig.pl |\
