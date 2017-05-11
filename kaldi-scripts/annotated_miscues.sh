@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
   echo "Usage: $0 <langdir> <reftext> <hyptext>"
   exit 65
 fi
