@@ -19,8 +19,8 @@ trap "rm -rf $tmpdir" EXIT HUP INT PIPE TERM
 
 declare -A refs #key-value store
 while read promptline; do
-  uttid=$(cut -d " " -f 1 "$promptline")
-  prompt=$(cut -d " " -f 2- "$promptline")
+  uttid=$(echo "$promptline" | cut -d " " -f 1 "$promptline")
+  prompt=$(echo "$promptline" | cut -d " " -f 2- "$promptline")
   keyfst="$tmpdir/uttid.key.fst"
   echo "$prompt" |\
     miscue-tolerant-lm-fst/make_miscue_annotation_transducer.py \
@@ -31,8 +31,8 @@ while read promptline; do
 done < $reftext
 
 while read hypline; do
-  uttid=$(cut -d " " -f 1 "$hypline")
-  hyp=$(cut -d " " -f 2- "$hypline")
+  uttid=$(echo "$hypline" | cut -d " " -f 1 "$hypline")
+  hyp=$(echo "$hypline" |cut -d " " -f 2- "$hypline")
   echo -n "$uttid" 
   echo "$hyp" |\
     miscue-tolerant-lm-fst/utt2fst.py \
