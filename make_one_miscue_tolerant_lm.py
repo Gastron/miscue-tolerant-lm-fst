@@ -207,7 +207,7 @@ if args.rubbish_label is not None:
 if args.truncation_label is not None:
     special_labels["Truncation"] = args.truncation_label
 if args.correct_boost is not None:
-    weights["Correct"] *= args.correct_boost #Argparse will produce a list of one float.
+    weights["Correct"] = weights["Correct"] * args.correct_boost 
 
 fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
 prompt = sys.stdin.readline()
