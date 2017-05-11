@@ -54,7 +54,7 @@ localdictsrc="$langdir"/dict
 langtmpdir="$langdir"/tmp
 
 mkdir -p "$langtmpdir" "$localdictsrc"
-trap "rm -rf $langtmpdir $localdictsrc $langdir" EXIT HUP INT PIPE TERM
+trap "rm -rf $langtmpdir $localdictsrc" EXIT HUP INT PIPE TERM
 
 [ -f path.sh ] && . ./path.sh
 
@@ -65,6 +65,8 @@ miscue-tolerant-lm-fst/kaldi-scripts/make_extended_lexicon.py --oov "$OOV" --tru
   "$dictsrcdir" "$localdictsrc" "$textfile"
 utils/prepare_lang.sh --sil-prob "$silprob" "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 cp "$localdictsrc"/{homophones,truncations}.txt "$langdir"
+echo "$OOV" > "$langdir"/rubbish
+echo "$truncation_symbol" > "$langdir"/truncation_symbol
 rm -rf "$langtmpdir"
 
 
