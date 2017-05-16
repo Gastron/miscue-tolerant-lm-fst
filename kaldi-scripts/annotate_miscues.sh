@@ -20,6 +20,9 @@ wordstxt="$fstdir/words.txt"
 
 while read hypline; do
   uttid=$(echo "$hypline" | cut -d " " -f 1 )
+  if [ "$hypline" = "$uttid" ]; then
+    continue
+  fi
   hyp=$(echo "$hypline" | cut -d " " -f 2- )
   echo -n "$uttid " 
   echo "$hyp" |\

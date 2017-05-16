@@ -6,6 +6,7 @@
 # a transduction.
 
 import sys
+lines_output = 0
 with sys.stdin as fi:
     while True:
         linesplit = fi.readline().strip().split()
@@ -14,4 +15,4 @@ with sys.stdin as fi:
             print linesplit[3],  #the fourth column has the output label
         else:
             break
-
+print
