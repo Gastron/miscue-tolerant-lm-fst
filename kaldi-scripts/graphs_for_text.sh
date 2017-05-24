@@ -11,64 +11,40 @@
 set -e -u
 set -o pipefail
 
-OOV="<SPOKEN_NOISE>"
-truncation_symbol="[TRUNC]:"
 scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
 correct_boost=1.0
 while getopts "o:t:s:b:" OPTNAME; do
   case "$OPTNAME" in
-    o) OOV="$OPTARG";;
-    t) truncation_symbol="$OPTARG";;
     s) scale_opts="$OPTARG";;
     b) correct_boost="$OPTARG";;
   esac
 done
 shift $((OPTIND - 1))
 
-silprob=0.7 #the default is 0.5, this should reflect higher hesitation time.
-
 if [ "$#" -ne 4 ]; then
-  echo "Usage: $0 <dictsrcdir> <modeldir> <datadir> <outdir>" >&2 
+  echo "Usage: $0 <langdir> <modeldir> <datadir> <outdir>" 
   echo "Options:"
-  echo "-o <OOV>                  Entry to use as pronunciation for oov words, default: <SPOKEN_NOISE>"
-  echo "-t <truncation-prefix>    Prefix for truncated words in lexicon, deufault: [TRUNC]:" 
   echo "-s <scale-opts>           Scale options to pass to kaldi. default:"
   echo "                            --transition-scale=1.0 --self-loop-scale=0.1"
   echo "-b <float>                Multiply the probability of the correct words by float, default 1.0 (no boost)"
   exit 1
 fi
 
-dictsrcdir="$1"
+langdir="$1"
 modeldir="$2"
 datadir="$3"
 outdir="$4"
 
 textfile="$datadir/text" 
-required="$textfile $modeldir/final.mdl $modeldir/tree"
+required="$textfile $modeldir/final.mdl $modeldir/tree $langdir/truncation_symbol $langdir/rubbish"
 for f in $required; do
   [ ! -f "$f" ] && echo "$0 expected $f to exist" >&2 && exit 1;
 done
 
-langdir="$outdir"/lang
-localdictsrc="$langdir"/dict
-langtmpdir="$langdir"/tmp
-
-mkdir -p "$langtmpdir" "$localdictsrc"
-trap "rm -rf $langtmpdir $localdictsrc" EXIT HUP INT PIPE TERM
+OOV=$(cat "$langdir/rubbish")
+truncation_symbol=$(cat "$langdir/truncation_symbol")
 
 [ -f path.sh ] && . ./path.sh
-
-cp -a "$dictsrcdir"/* "$localdictsrc"
-rm "$localdictsrc"/lexicon*.txt
-
-miscue-tolerant-lm-fst/kaldi-scripts/make_extended_lexicon.py --oov "$OOV" --truncation-label "$truncation_symbol" \
-  "$dictsrcdir" "$localdictsrc" "$textfile"
-utils/prepare_lang.sh --sil-prob "$silprob" "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
-cp "$localdictsrc"/{homophones,truncations}.txt "$langdir"
-echo "$OOV" > "$langdir"/rubbish
-echo "$truncation_symbol" > "$langdir"/truncation_symbol
-rm -rf "$langtmpdir"
-
 
 graphsdir="$outdir"
 graphsscp="$graphsdir/HCLG.fsts.scp"
