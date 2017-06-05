@@ -13,7 +13,7 @@ set -o pipefail
 
 scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
 correct_boost=1.0
-while getopts "o:t:s:b:" OPTNAME; do
+while getopts "s:b:" OPTNAME; do
   case "$OPTNAME" in
     s) scale_opts="$OPTARG";;
     b) correct_boost="$OPTARG";;
@@ -41,8 +41,13 @@ for f in $required; do
   [ ! -f "$f" ] && echo "$0 expected $f to exist" >&2 && exit 1;
 done
 
-OOV=$(cat "$langdir/rubbish")
-truncation_symbol=$(cat "$langdir/truncation_symbol")
+#Retrieve the rubbish, truncation and homophone info if available:
+rubbish_text=
+[ -f "$langdir"/rubbish ] && rubbish_text="--rubbish-label "$(cat $langdir/rubbish)
+truncation_text=
+[ -f "$langdir"/truncation_symbol ] && truncation_text="--truncation-label "$(cat $langdir/truncation_symbol)" --truncations $langdir/truncations.txt"
+homophone_text=
+[ -f "$langdir"/homophones.txt ] && homophone_text="--homophones $langdir/homophones.txt"
 
 [ -f path.sh ] && . ./path.sh
 
@@ -59,8 +64,9 @@ cat "$textfile" | while read promptline; do
   prompt=$(echo "$promptline" | cut -f 2- -d " " )
   echo "$uttid" #Header
   echo "$prompt"  | miscue-tolerant-lm-fst/make_one_miscue_tolerant_lm.py --correct-word-boost $correct_boost \
-    --homophones "$langdir"/homophones.txt --rubbish-label "$OOV" \
-    --truncation-label "$truncation_symbol" --truncations "$langdir"/truncations.txt |\
+    $rubbish_text \
+    $truncation_text \
+    $homophone_text |\
     utils/eps2disambig.pl |\
     utils/sym2int.pl -f 3-4 "$langdir"/words.txt >&1
   echo #empty line as separator
