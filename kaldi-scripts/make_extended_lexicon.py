@@ -50,7 +50,7 @@ def addOOVs(textwords, lexicon, oov):
             print(word)
             raise
 
-def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min_left_phonemes=2):
+def addTruncations(lexicon, textwords, truncation_label, min_cut_phonemes=2, min_left_phonemes=2, LEXICON_CONSTANT=1):
     """ Adds truncated lexicon entries for all textwords into the lexicon inplace.
     Returns the added words as a set. 
 
