@@ -8,7 +8,7 @@ set -e -u
 
 OOV="<SPOKEN_NOISE>"
 truncation_symbol="[TRUNC]:"
-scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
+scale_opts="--transition-scale 1.0 --self-loop-scale 0.1"
 correct_boost=1.0
 while getopts "o:t:s:b:" OPTNAME; do
   case "$OPTNAME" in
@@ -65,4 +65,4 @@ cat "$workdir"/uniqued_prompt.txt | miscue-tolerant-lm-fst/make_one_miscue_toler
   fstcompile --isymbols="$langdir"/words.txt --osymbols="$langdir"/words.txt |\
   fstarcsort --sort_type=ilabel > "$langdir"/G.fst
 
-utils/mkgraph.sh "$langdir" "$modeldir" "$graphdir"
+utils/mkgraph.sh $scale_opts "$langdir" "$modeldir" "$graphdir"
