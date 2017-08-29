@@ -8,6 +8,6 @@ The FSTs are created in the OpenFST format, and designed to work with the Kaldi 
 
 ## Usage:
 - The repository is designed to be cloned into a Kaldi egs/_<corpusname>_/s5 directory and called from that directory, ie. one level above the repository.
-- To create an FST for each utterance in a Kaldi-style data directory, use miscue-tolerant-lm-fst/kaldi-scripts/make_extended_lexicon.sh and miscue-tolerant-lm-fst/kaldi-scripts/graphs_for_text.sh
+- To create an FST for each utterance in a Kaldi-style data directory, use miscue-tolerant-lm-fst/kaldi-scripts/prepare_extended_lang.sh and miscue-tolerant-lm-fst/kaldi-scripts/graphs_for_text.sh
 - To create just one FST use miscue-tolerant-lm-fst/kaldi-scripts/make_one_decode_graph.sh
 
