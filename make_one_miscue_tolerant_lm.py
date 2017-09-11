@@ -204,17 +204,17 @@ if __name__ == "__main__":
         """The label to use for Truncation, concatenated with the word, like [TRUNC]:label""")
     args = parser.parse_args()
     if args.rubbish_label is not None:
-    special_labels["Rubbish"] = args.rubbish_label
+        special_labels["Rubbish"] = args.rubbish_label
     if args.truncation_label is not None:
-    special_labels["Truncation"] = args.truncation_label
+        special_labels["Truncation"] = args.truncation_label
     if args.correct_boost is not None:
-    weights["Correct"] = weights["Correct"] * args.correct_boost 
+        weights["Correct"] = weights["Correct"] * args.correct_boost 
 
     fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
     prompt = sys.stdin.readline()
     prompt_tokenised = prompt.strip().split()
     if not prompt_tokenised:
-    raise ValueError("Prompt empty!")
+        raise ValueError("Prompt empty!")
     fst.addWordSequence(prompt_tokenised)
     addCorrectPaths(fst, weights)
     addRubbishPaths(fst, weights, special_labels)
@@ -224,8 +224,8 @@ if __name__ == "__main__":
     addJumpsBackward(fst, weights)
     addJumpsForward(fst, weights)
     if args.truncations is not None:
-    truncated_words = readTruncations(args.truncations)
-    addTruncations(fst, weights, special_labels, truncated_words)
+        truncated_words = readTruncations(args.truncations)
+        addTruncations(fst, weights, special_labels, truncated_words)
 
     convertRelativeProbs(fst)
     print(fst.inText())
