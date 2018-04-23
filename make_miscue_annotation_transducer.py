@@ -171,49 +171,50 @@ def readTruncations(truncationsfile):
         truncationslist = fi.read().split()
     return set(truncationslist)
 
-## Now we just parse arguments and run the functions.
-parser.add_argument('--correct-word-boost', dest="correct_boost", 
-        nargs="?", type=float,
-        help="""Amount to multiply the correct words probability by.
-        Lower correct word probability will probably spot more miscues,
-        but also have more false positives.""")
-parser.add_argument('--homophones', nargs="?", help=
-        """File that contains a list of homophones. 
-        In each line, words are considered homophones.
-        e.g. 
-        too two
-        carat carrot""")
-parser.add_argument('--truncations', nargs="?", help=
-        """File that contains a list of words that have truncations in the dictionary.
-            On each line is one word""")
-parser.add_argument('--rubbish-label', dest="rubbish_label", nargs="?", help=
-        """The label to use for Rubbish, i.e. spoken noise""")
-parser.add_argument('--truncation-label', dest="truncation_label", nargs="?", help=
-        """The label to use for Truncation, concatenated with the word, like [TRUNC]:label""")
-args = parser.parse_args()
-if args.rubbish_label is not None:
-    special_labels["Rubbish"] = args.rubbish_label
-if args.truncation_label is not None:
-    special_labels["Truncation"] = args.truncation_label
-if args.correct_boost is not None:
-    weights["Correct"] = weights["Correct"] * args.correct_boost 
+if __name__ == "__main__":
+    ## Now we just parse arguments and run the functions.
+    parser.add_argument('--correct-word-boost', dest="correct_boost", 
+            nargs="?", type=float,
+            help="""Amount to multiply the correct words probability by.
+            Lower correct word probability will probably spot more miscues,
+            but also have more false positives.""")
+    parser.add_argument('--homophones', nargs="?", help=
+            """File that contains a list of homophones. 
+            In each line, words are considered homophones.
+            e.g. 
+            too two
+            carat carrot""")
+    parser.add_argument('--truncations', nargs="?", help=
+            """File that contains a list of words that have truncations in the dictionary.
+                On each line is one word""")
+    parser.add_argument('--rubbish-label', dest="rubbish_label", nargs="?", help=
+            """The label to use for Rubbish, i.e. spoken noise""")
+    parser.add_argument('--truncation-label', dest="truncation_label", nargs="?", help=
+            """The label to use for Truncation, concatenated with the word, like [TRUNC]:label""")
+    args = parser.parse_args()
+    if args.rubbish_label is not None:
+        special_labels["Rubbish"] = args.rubbish_label
+    if args.truncation_label is not None:
+        special_labels["Truncation"] = args.truncation_label
+    if args.correct_boost is not None:
+        weights["Correct"] = weights["Correct"] * args.correct_boost 
 
-fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
-prompt = sys.stdin.readline()
-prompt_tokenised = prompt.strip().split()
-if not prompt_tokenised:
-    raise ValueError("Prompt empty!")
-fst.addWordSequence(prompt_tokenised)
-addCorrectPaths(fst, weights, special_labels)
-addRubbishPaths(fst, weights, special_labels)
-addSkipPaths(fst, weights, special_labels)
-addRepeatPaths(fst, weights, special_labels)
-addPrematureEnds(fst, weights, special_labels)
-addJumpsBackward(fst, weights, special_labels)
-addJumpsForward(fst, weights, special_labels)
-if args.truncations is not None:
-    truncated_words = readTruncations(args.truncations)
-    addTruncations(fst, weights, special_labels, truncated_words)
+    fst = prompt_lmfst.PromptLMFST(homophones_path=args.homophones)
+    prompt = sys.stdin.readline()
+    prompt_tokenised = prompt.strip().split()
+    if not prompt_tokenised:
+        raise ValueError("Prompt empty!")
+    fst.addWordSequence(prompt_tokenised)
+    addCorrectPaths(fst, weights, special_labels)
+    addRubbishPaths(fst, weights, special_labels)
+    addSkipPaths(fst, weights, special_labels)
+    addRepeatPaths(fst, weights, special_labels)
+    addPrematureEnds(fst, weights, special_labels)
+    addJumpsBackward(fst, weights, special_labels)
+    addJumpsForward(fst, weights, special_labels)
+    if args.truncations is not None:
+        truncated_words = readTruncations(args.truncations)
+        addTruncations(fst, weights, special_labels, truncated_words)
 
-convertRelativeProbs(fst)
-print(fst.inText())
+    convertRelativeProbs(fst)
+    print(fst.inText())

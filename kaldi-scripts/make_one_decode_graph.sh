@@ -11,12 +11,14 @@ OOV="<SPOKEN_NOISE>"
 truncation_symbol="[TRUNC]:"
 scale_opts="--transition-scale 1.0 --self-loop-scale 0.1"
 correct_boost=1.0
-while getopts "o:t:s:b:" OPTNAME; do
+lang_opts=""
+while getopts "o:t:s:b:l:" OPTNAME; do
   case "$OPTNAME" in
     o) OOV="$OPTARG";;
     t) truncation_symbol="$OPTARG";;
     s) scale_opts="$OPTARG";;
     b) correct_boost="$OPTARG";;
+    l) lang_opts="$OPTARG";;
   esac
 done
 shift $((OPTIND - 1))
@@ -53,7 +55,7 @@ cp -a "$dictsrcdir"/* "$localdictsrc"
 rm "$localdictsrc"/lexicon*.txt
 miscue-tolerant-lm-fst/kaldi-scripts/make_utt_specific_lexicon.py --oov "$OOV" --truncation-label "$truncation_symbol" "$dictsrcdir" "$workdir" "$promptfile"
 mv "$workdir"/lexicon*.txt "$localdictsrc"
-utils/prepare_lang.sh "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
+utils/prepare_lang.sh $lang_opts "$localdictsrc" "$OOV" "$langtmpdir" "$langdir"
 cp "$workdir"/{homophones,truncations}.txt "$langdir"
 echo "$OOV" > "$langdir"/rubbish
 echo "$truncation_symbol" > "$langdir"/truncation_symbol

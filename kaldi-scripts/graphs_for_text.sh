@@ -11,22 +11,19 @@
 set -e -u
 set -o pipefail
 
+nj=2
+cmd=run.pl
 scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
 correct_boost=1.0
-while getopts "s:b:" OPTNAME; do
-  case "$OPTNAME" in
-    s) scale_opts="$OPTARG";;
-    b) correct_boost="$OPTARG";;
-  esac
-done
-shift $((OPTIND - 1))
+[ -f path.sh ] && . ./path.sh
+. parse_options.sh || exit 1;
 
 if [ "$#" -ne 4 ]; then
   echo "Usage: $0 <langdir> <modeldir> <datadir> <outdir>" 
   echo "Options:"
-  echo "-s <scale-opts>           Scale options to pass to kaldi. default:"
+  echo "--scale_opts <scale-opts>           Scale options to pass to kaldi. default:"
   echo "                            --transition-scale=1.0 --self-loop-scale=0.1"
-  echo "-b <float>                Multiply the probability of the correct words by float, default 1.0 (no boost)"
+  echo "--correct_boost <float>                Multiply the probability of the correct words by float, default 1.0 (no boost)"
   exit 1
 fi
 
@@ -49,17 +46,28 @@ truncation_text=
 homophone_text=
 [ -f "$langdir"/homophones.txt ] && homophone_text="--homophones $langdir/homophones.txt"
 
-[ -f path.sh ] && . ./path.sh
-
 graphsdir="$outdir"
 graphsscp="$graphsdir/HCLG.fsts.scp"
 #Make sure dir exists but graphsscp does not:
 mkdir -p "$graphsdir"
 rm -f "$graphsscp"
 
+#Create a table of unique prompts and relate each uttid to those:
+promptstbl="$outdir"/prompts.scp
+utt2prompt="$outdir"/utt2promptcrc
+rm -f "$promptstbl" "$utt2prompt"
+cat "$textfile" | while read promptline; do
+  uttid=$(echo "$promptline" | awk '{print $1}' )
+  prompt=$(echo "$promptline" | cut -f 2- -d " " )
+  promptcrc=$(echo "$prompt" | cksum - | cut -d" " -f 1)
+  #Save the relation, then echo for output
+  echo "$uttid $promptcrc" >> "$utt2prompt"
+  echo "$promptcrc $prompt"
+done | sort -u > "$promptstbl"
+
 #The while loop makes a text format G FST 
 #for each utterance in $textfile, then and echoes that:
-cat "$textfile" | while read promptline; do
+cat "$promptstbl" | while read promptline; do
   uttid=$(echo "$promptline" | awk '{print $1}' )
   prompt=$(echo "$promptline" | cut -f 2- -d " " )
   echo "$uttid" #Header
@@ -71,9 +79,13 @@ cat "$textfile" | while read promptline; do
     utils/sym2int.pl -f 3-4 "$langdir"/words.txt >&1
   echo #empty line as separator
 done |\
-  compile-train-graphs-fsts --batch-size=500 $scale_opts --read-disambig-syms="$langdir"/phones/disambig.int \
+  compile-train-graphs-fsts $scale_opts --read-disambig-syms="$langdir"/phones/disambig.int \
     "$modeldir"/tree $modeldir/final.mdl "$langdir"/L_disambig.fst ark:- \
-  ark,scp:"$graphsdir"/HCLG.fsts,"$graphsscp" 
+  ark,scp:"$graphsdir"/HCLG.fsts,"$graphsdir"/HCLG.fsts.per_prompt.scp
+
+#Now map the uttids to the correct fst:
+utils/apply_map.pl -f 2 "$graphsdir"/HCLG.fsts.per_prompt.scp <"$utt2prompt" > "$graphsscp"
+#rm "$graphsdir"/HCLG.fsts.per_prompt.scp "$utt2prompt" "$promptstbl"
 
 cp -a "$langdir"/* "$graphsdir"
 am-info --print-args=false "$modeldir/final.mdl" |\
