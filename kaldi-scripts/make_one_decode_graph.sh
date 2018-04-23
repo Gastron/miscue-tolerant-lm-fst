@@ -5,7 +5,7 @@
 # The lexicon and language model are created on the fly. 
 
 set -e -u 
-echo "$0 $@" >&2 #Logging
+echo "$0 $@" #Logging
 
 OOV="<SPOKEN_NOISE>"
 truncation_symbol="[TRUNC]:"
@@ -68,5 +68,5 @@ cat "$workdir"/uniqued_prompt.txt | miscue-tolerant-lm-fst/make_one_miscue_toler
   fstcompile --isymbols="$langdir"/words.txt --osymbols="$langdir"/words.txt |\
   fstarcsort --sort_type=ilabel > "$langdir"/G.fst
 
-echo "utils/mkgraph.sh $scale_opts $langdir $modeldir $graphdir" >&2 #Logging
+echo "utils/mkgraph.sh $scale_opts $langdir $modeldir $graphdir" #Logging
 utils/mkgraph.sh $scale_opts "$langdir" "$modeldir" "$graphdir"
