@@ -31,7 +31,7 @@ def readHomophones(filepath):
     homophones = defaultdict(set)
     if filepath is None:
         return homophones
-    with open(filepath, "r") as fi:
+    with open(filepath, encoding='utf-8') as fi:
         lines_split = (line.strip().split() for line in fi.readlines())
         for line in lines_split:
             for word in line:
@@ -43,13 +43,13 @@ class PromptLMFST(object):
     ## for a prompt.
     ## Represents the prompt as a sequence of Word objects.
 
-    def __init__(self,ID=None, homophones_path=None):
+    def __init__(self, homophones, ID=None):
         self.ID = ID
         self.words = [] #Word objects
         self.states = {}
         self.state_counter = 0
         self.initialised = False
-        self.homophones = readHomophones(homophones_path) #None is an acceptable argument here.
+        self.homophones = homophones #an empty set is an acceptable argument here.
         self.labels_by_state = {}
 
     def addNextWord(self, label):

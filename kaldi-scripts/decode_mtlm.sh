@@ -1,0 +1,2 @@
+#EXAMPLE:
+#steps/cleanup/decode_segmentation_nnet3.sh --allow-partial false --skip-scoring true --beam 4.0 --lattice-beam 3.0 --acwt 1.0 --minimize false --cmd "slurm.pl --mem 2G --time 5:0:0" --nj 16 --online-ivector-dir exp/nnet3_cleaned/ivectors_iwslt_train_2019 --post_decode_acwt 10.0 data/iwslt.train/mtlm_graphs_distributed data/iwslt.train exp/chain_cleaned/tdnn1f_sp_bi/decode_mtlm_iwslt_train2019_again
