@@ -11,11 +11,14 @@
 set -e -u
 set -o pipefail
 
-nj=2
+stage=0
+nj=16
 cmd=run.pl
 scale_opts="--transition-scale=1.0 --self-loop-scale=0.1"
 correct_boost=1.0
-[ -f path.sh ] && . ./path.sh
+cleanup=true
+
+. ./path.sh
 . parse_options.sh || exit 1;
 
 if [ "$#" -ne 4 ]; then
@@ -31,62 +34,55 @@ langdir="$1"
 modeldir="$2"
 datadir="$3"
 outdir="$4"
+mkdir -p "$outdir"/log
 
-textfile="$datadir/text" 
-required="$textfile $modeldir/final.mdl $modeldir/tree $langdir/truncation_symbol $langdir/rubbish"
+required="$datadir/text $datadir/utt2spk $modeldir/final.mdl $modeldir/tree $langdir/truncation_symbol $langdir/rubbish $langdir/homophones.txt"
 for f in $required; do
   [ ! -f "$f" ] && echo "$0 expected $f to exist" >&2 && exit 1;
 done
 
-#Retrieve the rubbish, truncation and homophone info if available:
-rubbish_text=
-[ -f "$langdir"/rubbish ] && rubbish_text="--rubbish-label "$(cat $langdir/rubbish)
-truncation_text=
-[ -f "$langdir"/truncation_symbol ] && truncation_text="--truncation-label "$(cat $langdir/truncation_symbol)" --truncations $langdir/truncations.txt"
-homophone_text=
-[ -f "$langdir"/homophones.txt ] && homophone_text="--homophones $langdir/homophones.txt"
+if [ $stage -le 1 ]; then
+  #Map uttids to unique prompts:
+  utils/split_data.sh $datadir $nj
+  $cmd JOB=1:$nj $outdir/log/get_prompt_ids.JOB.log \
+    miscue-tolerant-lm-fst/kaldi-scripts/map_utts_to_prompts.sh \
+    $datadir/split$nj/JOB/text \
+    $outdir/log/utt2promptcrc.JOB \
+    $outdir/log/prompts.JOB.scp
+  cat $outdir/log/utt2promptcrc.* > $outdir/utt2promptcrc
+  cat $outdir/log/prompts.*.scp | sort -u > $outdir/prompts.scp
+fi
 
-graphsdir="$outdir"
-graphsscp="$graphsdir/HCLG.fsts.scp"
-#Make sure dir exists but graphsscp does not:
-mkdir -p "$graphsdir"
-rm -f "$graphsscp"
+if [ $stage -le 2 ]; then
+  #Compile graphs (NOTE: now they map to promptcrcs):
+  $cmd JOB=1:$nj $outdir/log/compile_graphs.JOB.log \
+    miscue-tolerant-lm-fst/make_miscue_tolerant_lms.py \
+      --kaldi-style \
+      --rubbish-label $langdir/rubbish \
+      --truncation-label $langdir/truncation_symbol \
+      --truncations $langdir/truncations.txt \
+      --homophones $langdir/homophones.txt \
+      $outdir/log/prompts.JOB.scp \|\
+    utils/eps2disambig.pl \|\
+    utils/sym2int.pl -f 3-4 "$langdir"/words.txt \|\
+    compile-train-graphs-fsts $scale_opts \
+      --read-disambig-syms="$langdir"/phones/disambig.int \
+      "$modeldir"/tree $modeldir/final.mdl "$langdir"/L_disambig.fst ark:- \
+      ark,scp:$outdir/HCLG.JOB.fsts,$outdir/log/HCLG.JOB.fsts.per_prompt.scp
+  cat $outdir/log/HCLG.*.fsts.per_prompt.scp > $outdir/HCLG.fsts.per_prompt.scp
+fi
 
-#Create a table of unique prompts and relate each uttid to those:
-promptstbl="$outdir"/prompts.scp
-utt2prompt="$outdir"/utt2promptcrc
-rm -f "$promptstbl" "$utt2prompt"
-cat "$textfile" | while read promptline; do
-  uttid=$(echo "$promptline" | awk '{print $1}' )
-  prompt=$(echo "$promptline" | cut -f 2- -d " " )
-  promptcrc=$(echo "$prompt" | cksum - | cut -d" " -f 1)
-  #Save the relation, then echo for output
-  echo "$uttid $promptcrc" >> "$utt2prompt"
-  echo "$promptcrc $prompt"
-done | sort -u > "$promptstbl"
+if [ $stage -le 3 ]; then
+  #Now map the uttids to the correct fst:
+  utils/apply_map.pl -f 2 "$outdir"/HCLG.fsts.per_prompt.scp \
+    <$outdir/utt2promptcrc > $outdir/HCLG.fsts.scp
 
-#The while loop makes a text format G FST 
-#for each utterance in $textfile, then and echoes that:
-cat "$promptstbl" | while read promptline; do
-  uttid=$(echo "$promptline" | awk '{print $1}' )
-  prompt=$(echo "$promptline" | cut -f 2- -d " " )
-  echo "$uttid" #Header
-  echo "$prompt"  | miscue-tolerant-lm-fst/make_one_miscue_tolerant_lm.py --correct-word-boost $correct_boost \
-    $rubbish_text \
-    $truncation_text \
-    $homophone_text |\
-    utils/eps2disambig.pl |\
-    utils/sym2int.pl -f 3-4 "$langdir"/words.txt >&1
-  echo #empty line as separator
-done |\
-  compile-train-graphs-fsts $scale_opts --read-disambig-syms="$langdir"/phones/disambig.int \
-    "$modeldir"/tree $modeldir/final.mdl "$langdir"/L_disambig.fst ark:- \
-  ark,scp:"$graphsdir"/HCLG.fsts,"$graphsdir"/HCLG.fsts.per_prompt.scp
+  cp -a "$langdir"/* "$outdir"
+  am-info --print-args=false "$modeldir/final.mdl" |\
+   grep pdfs | awk '{print $NF}' > "$outdir/num_pdfs"
 
-#Now map the uttids to the correct fst:
-utils/apply_map.pl -f 2 "$graphsdir"/HCLG.fsts.per_prompt.scp <"$utt2prompt" > "$graphsscp"
-#rm "$graphsdir"/HCLG.fsts.per_prompt.scp "$utt2prompt" "$promptstbl"
-
-cp -a "$langdir"/* "$graphsdir"
-am-info --print-args=false "$modeldir/final.mdl" |\
- grep pdfs | awk '{print $NF}' > "$graphsdir/num_pdfs"
+  if [ $cleanup = true ]; then
+    rm $outdir/log/utt2promptcrc.* $outdir/log/prompts.*.scp \
+      $outdir/utt2promptcrc $outdir/prompts.scp
+  fi
+fi

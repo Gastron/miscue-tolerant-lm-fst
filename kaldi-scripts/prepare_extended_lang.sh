@@ -13,7 +13,7 @@ if [ "$#" -ne 3 ]; then
   echo "Usage: $0 <dictsrcdir> <datadir> <outdir>"
   echo "Options:"
   echo "--OOV <OOV>                  Entry to use as pronunciation for oov words, default: <SPOKEN_NOISE>"
-  echo "-truncation_symbol <truncation-prefix>   Prefix for truncated words in lexicon, default: [TRUNC]:" 
+  echo "--truncation_symbol <truncation-prefix>   Prefix for truncated words in lexicon, default: [TRUNC]:" 
   exit 1
 fi
 
